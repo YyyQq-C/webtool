@@ -116,16 +116,98 @@ app.post('/api/generate-pdf', async (req, res) => {
 
         await new Promise(r => setTimeout(r, 2000));
 
-        const pdf = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            margin: {
-                top: '20px',
-                right: '20px',
-                bottom: '20px',
-                left: '20px',
-            },
-        });
+        let pdf;
+
+        if (mode === 'images') {
+            // 提取图片模式：每页一张图片
+            // 方法：直接修改页面 DOM，只保留图片并添加分页
+            await page.evaluate(() => {
+                // 获取所有图片
+                const images = Array.from(document.querySelectorAll('img'))
+                    .filter(img => img.src && img.naturalWidth > 50);
+
+                // 清空 body
+                document.body.innerHTML = '';
+                document.body.style.margin = '0';
+                document.body.style.padding = '0';
+                document.body.style.background = 'white';
+
+                // 添加样式
+                const style = document.createElement('style');
+                style.textContent = `
+                    @page { size: A4; margin: 1cm; }
+                    .img-page {
+                        width: 100%;
+                        min-height: 277mm; /* A4 height minus margins */
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        page-break-after: always;
+                        padding: 1cm;
+                        box-sizing: border-box;
+                    }
+                    .img-page:last-child {
+                        page-break-after: auto;
+                    }
+                    .img-page img {
+                        max-width: 100%;
+                        max-height: 277mm;
+                        object-fit: contain;
+                    }
+                `;
+                document.head.appendChild(style);
+
+                // 创建图片页面
+                images.forEach(img => {
+                    const div = document.createElement('div');
+                    div.className = 'img-page';
+                    const newImg = document.createElement('img');
+                    newImg.src = img.src;
+                    newImg.alt = img.alt || '';
+                    div.appendChild(newImg);
+                    document.body.appendChild(div);
+                });
+            });
+
+            // 等待所有新图片加载
+            await page.evaluate(async () => {
+                const images = Array.from(document.querySelectorAll('img'));
+                await Promise.all(images.map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.onload = resolve;
+                        img.onerror = resolve;
+                        setTimeout(resolve, 15000);
+                    });
+                }));
+            });
+
+            // 额外等待
+            await new Promise(r => setTimeout(r, 5000));
+
+            pdf = await page.pdf({
+                format: 'A4',
+                printBackground: false,
+                margin: {
+                    top: '0',
+                    right: '0',
+                    bottom: '0',
+                    left: '0',
+                },
+            });
+        } else {
+            // 完整页面模式
+            pdf = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: {
+                    top: '20px',
+                    right: '20px',
+                    bottom: '20px',
+                    left: '20px',
+                },
+            });
+        }
 
         await page.close();
 
