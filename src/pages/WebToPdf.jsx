@@ -8,13 +8,37 @@ function WebToPdf() {
   const [url, setUrl] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
   const [mode, setMode] = useState('full') // 'full' | 'images'
   const [fetchedHtml, setFetchedHtml] = useState('')
   const [pageTitle, setPageTitle] = useState('')
   const [pageImages, setPageImages] = useState([])
+  const [sessionId, setSessionId] = useState('')
+  const [downloadedImages, setDownloadedImages] = useState([])
+  const [expiresAt, setExpiresAt] = useState(null)
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
   const previewFrameRef = useRef(null)
+  const countdownRef = useRef(null)
+
+  // 倒计时
+  useEffect(() => {
+    if (expiresAt) {
+      countdownRef.current = setInterval(() => {
+        const remaining = expiresAt - Date.now()
+        if (remaining <= 0) {
+          clearInterval(countdownRef.current)
+          setSessionId('')
+          setDownloadedImages([])
+          setExpiresAt(null)
+          setError('会话已过期，图片已清理。请重新解析。')
+        }
+      }, 1000)
+      return () => clearInterval(countdownRef.current)
+    }
+  }, [expiresAt])
 
   // 将 HTML 加载到 iframe 中（隔离 CSS）
   useEffect(() => {
@@ -46,7 +70,6 @@ function WebToPdf() {
           a {
             color: #3b82f6;
           }
-          /* 阻止外部 CSS 影响父页面 */
           * {
             max-width: 100%;
           }
@@ -78,6 +101,9 @@ function WebToPdf() {
     setFetchedHtml('')
     setPageTitle('')
     setPageImages([])
+    setSessionId('')
+    setDownloadedImages([])
+    setExpiresAt(null)
 
     try {
       const res = await fetch(`${SERVER_URL}/bg-api/api/fetch-page?url=${encodeURIComponent(targetUrl)}&mode=${mode}`)
@@ -103,8 +129,69 @@ function WebToPdf() {
     }
   }, [url, mode])
 
-  // 服务端生成PDF
-  const generatePdf = useCallback(async () => {
+  // 下载图片到服务器
+  const downloadImages = useCallback(async () => {
+    if (pageImages.length === 0) return
+
+    setIsDownloading(true)
+    setError('')
+
+    try {
+      const res = await fetch(`${SERVER_URL}/bg-api/api/download-images`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, images: pageImages }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `下载失败 (${res.status})`)
+      }
+
+      const data = await res.json()
+      setSessionId(data.sessionId)
+      setDownloadedImages(data.images.filter(img => !img.error))
+      setExpiresAt(data.expiresAt)
+    } catch (err) {
+      setError(err.message || '下载失败')
+    } finally {
+      setIsDownloading(false)
+    }
+  }, [url, pageImages])
+
+  // 生成图片 PDF
+  const generateImagesPdf = useCallback(async () => {
+    const selectedImages = downloadedImages.filter(img => img.selected !== false)
+    if (selectedImages.length === 0) {
+      setError('请至少选择一张图片')
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const res = await fetch(`${SERVER_URL}/bg-api/api/generate-images-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, selectedImages }),
+      })
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || `生成失败 (${res.status})`)
+      }
+
+      const blob = await res.blob()
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+      saveAs(blob, `${pageTitle || 'images'}_${timestamp}.pdf`)
+    } catch (err) {
+      setError(err.message || 'PDF生成失败')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [sessionId, downloadedImages, pageTitle])
+
+  // 生成PDF（完整页面）
+  const generateFullPdf = useCallback(async () => {
     if (!url.trim()) return
 
     let targetUrl = url.trim()
@@ -120,20 +207,112 @@ function WebToPdf() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.detail || `生成失败 (${res.status})`)
+        throw new Error(errData.error || `生成失败 (${res.status})`)
       }
 
       const blob = await res.blob()
       const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
       const domain = new URL(targetUrl).hostname.replace(/\./g, '_')
-      const suffix = mode === 'images' ? '_images' : ''
-      saveAs(blob, `${domain}${suffix}_${timestamp}.pdf`)
+      saveAs(blob, `${domain}_${timestamp}.pdf`)
     } catch (err) {
       setError(err.message || 'PDF生成失败')
     } finally {
       setIsGenerating(false)
     }
   }, [url, mode])
+
+  // 生成PDF
+  const generatePdf = useCallback(() => {
+    if (mode === 'images' && sessionId) {
+      generateImagesPdf()
+    } else {
+      generateFullPdf()
+    }
+  }, [mode, sessionId, generateImagesPdf, generateFullPdf])
+
+  // 切换图片选择
+  const toggleImageSelection = useCallback((id) => {
+    setDownloadedImages(prev =>
+      prev.map(img =>
+        img.id === id ? { ...img, selected: !img.selected } : img
+      )
+    )
+  }, [])
+
+  // 全选/取消全选
+  const toggleSelectAll = useCallback(() => {
+    const allSelected = downloadedImages.every(img => img.selected !== false)
+    setDownloadedImages(prev =>
+      prev.map(img => ({ ...img, selected: !allSelected }))
+    )
+  }, [downloadedImages])
+
+  // 拖拽排序
+  const handleDragStart = useCallback((index) => {
+    setDragIndex(index)
+  }, [])
+
+  const handleDragOver = useCallback((e, index) => {
+    e.preventDefault()
+    setDragOverIndex(index)
+  }, [])
+
+  const handleDrop = useCallback((dropIndex) => {
+    if (dragIndex === null || dragIndex === dropIndex) {
+      setDragIndex(null)
+      setDragOverIndex(null)
+      return
+    }
+
+    setDownloadedImages(prev => {
+      const newImages = [...prev]
+      const [dragged] = newImages.splice(dragIndex, 1)
+      newImages.splice(dropIndex, 0, dragged)
+      return newImages
+    })
+
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [dragIndex])
+
+  const handleDragEnd = useCallback(() => {
+    setDragIndex(null)
+    setDragOverIndex(null)
+  }, [])
+
+  // 上移/下移
+  const moveImage = useCallback((index, direction) => {
+    const newIndex = index + direction
+    if (newIndex < 0 || newIndex >= downloadedImages.length) return
+
+    setDownloadedImages(prev => {
+      const newImages = [...prev]
+      const temp = newImages[index]
+      newImages[index] = newImages[newIndex]
+      newImages[newIndex] = temp
+      return newImages
+    })
+  }, [downloadedImages.length])
+
+  // 获取剩余时间
+  const getRemainingTime = useCallback(() => {
+    if (!expiresAt) return ''
+    const remaining = expiresAt - Date.now()
+    const minutes = Math.floor(remaining / 60000)
+    const seconds = Math.floor((remaining % 60000) / 1000)
+    return `${minutes}分${seconds}秒`
+  }, [expiresAt])
+
+  // 格式化文件大小
+  const formatFileSize = (bytes) => {
+    if (!bytes || bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  const selectedCount = downloadedImages.filter(img => img.selected !== false).length
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -219,19 +398,149 @@ function WebToPdf() {
                   <span className="ml-2">— 已提取 {pageImages.length} 张图片</span>
                 )}
               </div>
-              <button
-                onClick={generatePdf}
-                disabled={isGenerating}
-                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                type="button"
-              >
-                {isGenerating ? '生成中...' : '📄 导出 PDF'}
-              </button>
+              <div className="flex gap-3">
+                {mode === 'images' && sessionId && (
+                  <>
+                    <span className="text-[#94A3B8] text-sm">
+                      已选 {selectedCount}/{downloadedImages.length} 张 | 剩余时间：{getRemainingTime()}
+                    </span>
+                    <button
+                      onClick={generatePdf}
+                      disabled={isGenerating || selectedCount === 0}
+                      className="px-6 py-2 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      type="button"
+                    >
+                      {isGenerating ? '生成中...' : '📄 导出 PDF'}
+                    </button>
+                  </>
+                )}
+                {mode === 'full' && (
+                  <button
+                    onClick={generatePdf}
+                    disabled={isGenerating}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                  >
+                    {isGenerating ? '生成中...' : '📄 导出 PDF'}
+                  </button>
+                )}
+                {mode === 'images' && !sessionId && pageImages.length > 0 && (
+                  <button
+                    onClick={downloadImages}
+                    disabled={isDownloading}
+                    className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    type="button"
+                  >
+                    {isDownloading ? '下载中...' : '📥 下载图片'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* 图片模式 */}
-          {mode === 'images' && pageImages.length > 0 && (
+          {/* 图片模式 - 显示下载的图片列表 */}
+          {mode === 'images' && sessionId && downloadedImages.length > 0 && (
+            <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#475569] flex items-center justify-between">
+                <h3 className="text-[#F8FAFC] font-semibold">
+                  已下载 {downloadedImages.length} 张图片
+                </h3>
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-sm text-[#94A3B8] hover:text-[#F8FAFC] transition-colors"
+                  type="button"
+                >
+                  {downloadedImages.every(img => img.selected !== false) ? '取消全选' : '全选'}
+                </button>
+              </div>
+              <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
+                {downloadedImages.map((img, idx) => (
+                  <div
+                    key={img.id}
+                    draggable
+                    onDragStart={() => handleDragStart(idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={() => handleDrop(idx)}
+                    onDragEnd={handleDragEnd}
+                    className={`relative bg-[#334155] rounded-lg overflow-hidden transition-all ${
+                      img.selected === false ? 'opacity-50' : ''
+                    } ${dragOverIndex === idx ? 'ring-2 ring-[#22C55E]' : ''}`}
+                  >
+                    {/* 选择框 */}
+                    <div className="absolute top-2 left-2 z-10">
+                      <button
+                        onClick={() => toggleImageSelection(img.id)}
+                        className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
+                          img.selected !== false
+                            ? 'bg-[#22C55E] border-[#22C55E]'
+                            : 'bg-transparent border-[#64748B]'
+                        }`}
+                        type="button"
+                      >
+                        {img.selected !== false && (
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 拖拽手柄 */}
+                    <div className="absolute top-2 right-2 z-10 cursor-grab active:cursor-grabbing text-[#64748B] hover:text-[#F8FAFC]">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+                        <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+                        <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+                      </svg>
+                    </div>
+
+                    {/* 序号 */}
+                    <div className="absolute bottom-2 left-2 z-10 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                      {idx + 1}
+                    </div>
+
+                    <img
+                      src={img.path}
+                      alt={img.alt}
+                      className="w-full h-40 object-cover"
+                      loading="lazy"
+                    />
+                    <div className="p-2">
+                      <p className="text-[#94A3B8] text-xs truncate" title={img.alt}>{img.alt}</p>
+                      <p className="text-[#64748B] text-xs">{formatFileSize(img.size)}</p>
+                    </div>
+
+                    {/* 上下移动按钮 */}
+                    <div className="absolute bottom-2 right-2 flex gap-1">
+                      <button
+                        onClick={() => moveImage(idx, -1)}
+                        disabled={idx === 0}
+                        className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors"
+                        type="button"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => moveImage(idx, 1)}
+                        disabled={idx === downloadedImages.length - 1}
+                        className="p-1 bg-black/60 hover:bg-black/80 text-white rounded disabled:opacity-30 transition-colors"
+                        type="button"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 图片模式 - 显示提取的图片（未下载） */}
+          {mode === 'images' && !sessionId && pageImages.length > 0 && (
             <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#475569]">
                 <h3 className="text-[#F8FAFC] font-semibold">提取的图片</h3>
@@ -249,21 +558,18 @@ function WebToPdf() {
             </div>
           )}
 
-          {/* 完整页面预览 - 使用 iframe 隔离 CSS */}
+          {/* 完整页面预览 */}
           {mode === 'full' && (
             <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#475569]">
                 <h3 className="text-[#F8FAFC] font-semibold">页面预览</h3>
               </div>
-              <div className="p-4">
-                <div className="bg-white rounded-lg overflow-hidden" style={{ height: '70vh' }}>
-                  <iframe
-                    ref={previewFrameRef}
-                    title="网页预览"
-                    className="w-full h-full border-0"
-                    sandbox="allow-same-origin"
-                  />
-                </div>
+              <div className="p-4 overflow-auto max-h-[70vh]">
+                <div
+                  ref={previewFrameRef}
+                  className="bg-white rounded-lg overflow-hidden"
+                  style={{ height: '70vh' }}
+                />
               </div>
             </div>
           )}

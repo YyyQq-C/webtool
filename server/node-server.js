@@ -2,10 +2,40 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const cors = require('cors');
 const { URL } = require('url');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// 临时文件目录
+const TEMP_DIR = path.join(__dirname, 'temp');
+if (!fs.existsSync(TEMP_DIR)) {
+    fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+// 存储会话数据
+const sessions = new Map();
+
+// 清理过期文件（10分钟）
+const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10分钟
+setInterval(() => {
+    const now = Date.now();
+    for (const [sessionId, data] of sessions.entries()) {
+        if (now - data.createdAt > CLEANUP_INTERVAL) {
+            // 删除会话文件夹
+            const sessionDir = path.join(TEMP_DIR, sessionId);
+            if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+            }
+            sessions.delete(sessionId);
+            console.log(`[CLEANUP] 清理过期会话: ${sessionId}`);
+        }
+    }
+}, 60000); // 每分钟检查一次
 
 let browser = null;
 
@@ -24,6 +54,36 @@ async function getBrowser() {
         });
     }
     return browser;
+}
+
+// 下载图片到服务器
+async function downloadImage(url, filePath) {
+    return new Promise((resolve, reject) => {
+        const client = url.startsWith('https') ? https : http;
+        client.get(url, (response) => {
+            if (response.statusCode === 302 || response.statusCode === 301) {
+                // 重定向
+                downloadImage(response.headers.location, filePath).then(resolve).catch(reject);
+                return;
+            }
+            if (response.statusCode !== 200) {
+                reject(new Error(`HTTP ${response.statusCode}`));
+                return;
+            }
+
+            const writer = fs.createWriteStream(filePath);
+            response.pipe(writer);
+            writer.on('finish', () => {
+                const stats = fs.statSync(filePath);
+                resolve({
+                    path: filePath,
+                    size: stats.size,
+                    url: url,
+                });
+            });
+            writer.on('error', reject);
+        }).on('error', reject);
+    });
 }
 
 app.get('/health', (req, res) => {
@@ -90,6 +150,164 @@ app.get('/api/fetch-page', async (req, res) => {
     }
 });
 
+// 下载图片到服务器
+app.post('/api/download-images', async (req, res) => {
+    const { url, images } = req.body;
+
+    if (!url || !images || !Array.isArray(images)) {
+        return res.status(400).json({ error: 'Missing url or images parameter' });
+    }
+
+    try {
+        // 创建会话
+        const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const sessionDir = path.join(TEMP_DIR, sessionId);
+        fs.mkdirSync(sessionDir, { recursive: true });
+
+        // 存储会话信息
+        sessions.set(sessionId, {
+            createdAt: Date.now(),
+            url: url,
+            dir: sessionDir,
+            images: [],
+        });
+
+        // 下载图片
+        const downloadedImages = [];
+        for (let i = 0; i < images.length; i++) {
+            const img = images[i];
+            try {
+                const ext = path.extname(new URL(img.src).pathname) || '.jpg';
+                const filename = `${i + 1}${ext}`;
+                const filePath = path.join(sessionDir, filename);
+
+                const result = await downloadImage(img.src, filePath);
+
+                downloadedImages.push({
+                    id: `${sessionId}-${i}`,
+                    filename: filename,
+                    alt: img.alt || '图片',
+                    url: img.src,
+                    size: result.size,
+                    path: `/api/temp/${sessionId}/${filename}`,
+                    index: i,
+                });
+            } catch (error) {
+                console.error(`下载图片失败: ${img.src}`, error.message);
+                downloadedImages.push({
+                    id: `${sessionId}-${i}`,
+                    filename: `${i + 1}.jpg`,
+                    alt: img.alt || '图片',
+                    url: img.src,
+                    size: 0,
+                    path: null,
+                    index: i,
+                    error: error.message,
+                });
+            }
+        }
+
+        // 更新会话
+        sessions.get(sessionId).images = downloadedImages;
+
+        res.json({
+            sessionId,
+            images: downloadedImages,
+            expiresAt: sessions.get(sessionId).createdAt + CLEANUP_INTERVAL,
+        });
+    } catch (error) {
+        console.error('Download images error:', error);
+        res.status(500).json({ error: `下载图片失败: ${error.message}` });
+    }
+});
+
+// 获取会话图片列表
+app.get('/api/session/:sessionId', (req, res) => {
+    const { sessionId } = req.params;
+    const session = sessions.get(sessionId);
+
+    if (!session) {
+        return res.status(404).json({ error: '会话不存在或已过期' });
+    }
+
+    res.json({
+        sessionId,
+        images: session.images,
+        expiresAt: session.createdAt + CLEANUP_INTERVAL,
+    });
+});
+
+// 提供临时文件访问
+app.get('/api/temp/:sessionId/:filename', (req, res) => {
+    const { sessionId, filename } = req.params;
+    const filePath = path.join(TEMP_DIR, sessionId, filename);
+
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: '文件不存在' });
+    }
+
+    res.sendFile(filePath);
+});
+
+// 生成图片 PDF
+app.post('/api/generate-images-pdf', async (req, res) => {
+    const { sessionId, selectedImages } = req.body;
+
+    if (!sessionId || !selectedImages || !Array.isArray(selectedImages)) {
+        return res.status(400).json({ error: 'Missing sessionId or selectedImages' });
+    }
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+        return res.status(404).json({ error: '会话不存在或已过期' });
+    }
+
+    try {
+        const browser = await getBrowser();
+        const page = await browser.newPage();
+
+        // 构建 HTML
+        let htmlContent = '<!DOCTYPE html><html><head><style>';
+        htmlContent += '@page { size: A4; margin: 1cm; }';
+        htmlContent += 'body { margin: 0; padding: 0; background: white; }';
+        htmlContent += '.img-page { width: 100%; min-height: 277mm; display: flex; align-items: center; justify-content: center; page-break-after: always; padding: 1cm; box-sizing: border-box; }';
+        htmlContent += '.img-page:last-child { page-break-after: auto; }';
+        htmlContent += '.img-page img { max-width: 100%; max-height: 277mm; object-fit: contain; }';
+        htmlContent += '</style></head><body>';
+
+        for (const img of selectedImages) {
+            const imgPath = path.join(TEMP_DIR, sessionId, img.filename);
+            if (fs.existsSync(imgPath)) {
+                const imgData = fs.readFileSync(imgPath).toString('base64');
+                const ext = path.extname(img.filename).toLowerCase();
+                const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                htmlContent += `<div class="img-page"><img src="data:${mimeType};base64,${imgData}" alt="${img.alt || ''}" /></div>`;
+            }
+        }
+
+        htmlContent += '</body></html>';
+
+        await page.setContent(htmlContent, { waitUntil: 'networkidle2' });
+        await new Promise(r => setTimeout(r, 2000));
+
+        const pdf = await page.pdf({
+            format: 'A4',
+            printBackground: false,
+            margin: { top: '0', right: '0', bottom: '0', left: '0' },
+        });
+
+        await page.close();
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="selected-images.pdf"');
+        res.send(pdf);
+    } catch (error) {
+        console.error('Generate images PDF error:', error);
+        res.status(500).json({ error: `PDF生成失败: ${error.message}` });
+    }
+});
+
+// 生成完整页面 PDF
 app.post('/api/generate-pdf', async (req, res) => {
     let url = req.query.url;
     if (!url) {
@@ -120,25 +338,21 @@ app.post('/api/generate-pdf', async (req, res) => {
 
         if (mode === 'images') {
             // 提取图片模式：每页一张图片
-            // 方法：直接修改页面 DOM，只保留图片并添加分页
             await page.evaluate(() => {
-                // 获取所有图片
                 const images = Array.from(document.querySelectorAll('img'))
                     .filter(img => img.src && img.naturalWidth > 50);
 
-                // 清空 body
                 document.body.innerHTML = '';
                 document.body.style.margin = '0';
                 document.body.style.padding = '0';
                 document.body.style.background = 'white';
 
-                // 添加样式
                 const style = document.createElement('style');
                 style.textContent = `
                     @page { size: A4; margin: 1cm; }
                     .img-page {
                         width: 100%;
-                        min-height: 277mm; /* A4 height minus margins */
+                        min-height: 277mm;
                         display: flex;
                         align-items: center;
                         justify-content: center;
@@ -146,9 +360,7 @@ app.post('/api/generate-pdf', async (req, res) => {
                         padding: 1cm;
                         box-sizing: border-box;
                     }
-                    .img-page:last-child {
-                        page-break-after: auto;
-                    }
+                    .img-page:last-child { page-break-after: auto; }
                     .img-page img {
                         max-width: 100%;
                         max-height: 277mm;
@@ -157,7 +369,6 @@ app.post('/api/generate-pdf', async (req, res) => {
                 `;
                 document.head.appendChild(style);
 
-                // 创建图片页面
                 images.forEach(img => {
                     const div = document.createElement('div');
                     div.className = 'img-page';
@@ -169,7 +380,6 @@ app.post('/api/generate-pdf', async (req, res) => {
                 });
             });
 
-            // 等待所有新图片加载
             await page.evaluate(async () => {
                 const images = Array.from(document.querySelectorAll('img'));
                 await Promise.all(images.map(img => {
@@ -182,30 +392,18 @@ app.post('/api/generate-pdf', async (req, res) => {
                 }));
             });
 
-            // 额外等待
             await new Promise(r => setTimeout(r, 5000));
 
             pdf = await page.pdf({
                 format: 'A4',
                 printBackground: false,
-                margin: {
-                    top: '0',
-                    right: '0',
-                    bottom: '0',
-                    left: '0',
-                },
+                margin: { top: '0', right: '0', bottom: '0', left: '0' },
             });
         } else {
-            // 完整页面模式
             pdf = await page.pdf({
                 format: 'A4',
                 printBackground: true,
-                margin: {
-                    top: '20px',
-                    right: '20px',
-                    bottom: '20px',
-                    left: '20px',
-                },
+                margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' },
             });
         }
 
