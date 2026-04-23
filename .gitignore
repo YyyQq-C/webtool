@@ -22,4 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Server temp files
 __pycache__
+server/temp
+server/uploads
+server/temp-watermark
+server/node_modules
