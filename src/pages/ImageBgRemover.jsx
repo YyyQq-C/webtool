@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { saveAs } from 'file-saver'
 import { removeBackground } from '@imgly/background-removal'
+import UploadArea, { isImageFile } from '../components/UploadArea'
+import ImageEditor from '../components/ImageEditor'
 
 const SERVER_URL = '' // 通过同域 nginx 代理，/bg-api → :8000
 
@@ -11,10 +13,19 @@ function ImageBgRemover() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState('')
   const [mode, setMode] = useState('browser') // 'browser' | 'server'
+  const [uploadError, setUploadError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
 
   // 处理文件上传
   const handleFile = useCallback((file) => {
-    if (!file || !file.type.startsWith('image/')) return
+    setUploadError('')
+    if (!file) return
+
+    if (!isImageFile(file)) {
+      setUploadError('不支持的文件格式，请上传图片文件')
+      setTimeout(() => setUploadError(''), 3000)
+      return
+    }
 
     if (result) {
       URL.revokeObjectURL(result)
@@ -219,31 +230,7 @@ function ImageBgRemover() {
 
       {/* 上传区域 */}
       {!image && (
-        <div
-          className="relative border-2 border-dashed border-[#475569] bg-[#1E293B]/40 hover:border-[#22C55E] hover:bg-[#1E293B]/60 rounded-2xl p-12 text-center transition-all duration-300"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
-            if (files.length > 0) handleDrop(files)
-          }}
-          onClick={() => document.getElementById('bg-file-input').click()}
-        >
-          <input
-            id="bg-file-input"
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const files = Array.from(e.target.files)
-              if (files.length > 0) handleFile(files[0])
-              e.target.value = ''
-            }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          />
-          <div className="text-6xl mb-4">🖼️</div>
-          <p className="text-xl font-medium text-[#F8FAFC] mb-2">拖拽图片到这里</p>
-          <p className="text-[#94A3B8]">或点击选择文件</p>
-        </div>
+        <UploadArea onDrop={handleDrop} isImageFile={isImageFile} error={uploadError} setError={setUploadError} onFileSelect={handleFile} />
       )}
 
       {/* 对比预览 */}
@@ -262,9 +249,22 @@ function ImageBgRemover() {
           </div>
 
           <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#475569]">
-              <h3 className="text-[#F8FAFC] font-semibold">{result ? '去背景结果' : '处理结果'}</h3>
-              {result && <p className="text-[#22C55E] text-sm">✅ 已完成，可下载PNG</p>}
+            <div className="px-4 py-3 border-b border-[#475569] flex items-center justify-between">
+              <div>
+                <h3 className="text-[#F8FAFC] font-semibold">{result ? '去背景结果' : '处理结果'}</h3>
+                {result && <p className="text-[#22C55E] text-sm">✅ 已完成，可下载PNG</p>}
+              </div>
+              {result && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="px-3 py-1.5 bg-[#3B82F6] hover:bg-[#2563EB] text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                  编辑
+                </button>
+              )}
             </div>
             <div className="p-4">
               <div
@@ -330,6 +330,19 @@ function ImageBgRemover() {
           </div>
         </div>
       </div>
+
+      {/* 图片编辑器 */}
+      {isEditing && (
+        <ImageEditor
+          originalImage={image?.preview}
+          resultImage={result}
+          onSave={(editedUrl) => {
+            if (result) URL.revokeObjectURL(result)
+            setResult(editedUrl)
+            setIsEditing(false)
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -43,7 +43,7 @@ async def remove_bg(file: UploadFile = File(...)):
             img = img.convert("RGBA")
 
         # 去背景 - u2net 模型效果最好
-        result = remove(img, model_name="u2net")
+        result = remove(img)
 
         # 直接返回 PNG 字节流
         buf = io.BytesIO()

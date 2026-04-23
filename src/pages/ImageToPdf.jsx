@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { saveAs } from 'file-saver'
 import { jsPDF } from 'jspdf'
-import ImageDropzone from '../components/ImageDropzone'
+import UploadArea from '../components/UploadArea'
 
 function ImageToPdf() {
   const [images, setImages] = useState([])
@@ -289,7 +289,7 @@ function ImageToPdf() {
       </div>
 
       {/* 拖拽上传区域 */}
-      <ImageDropzone onDrop={handleDrop} />
+      <UploadArea onDrop={handleDrop} />
 
       {/* 图片排序列表 */}
       {images.length > 0 && (

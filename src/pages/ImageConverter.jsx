@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import JSZip from 'jszip'
 import { saveAs } from 'file-saver'
-import ImageDropzone from '../components/ImageDropzone'
+import UploadArea from '../components/UploadArea'
 import ImagePreview from '../components/ImagePreview'
 
 const SUPPORTED_FORMATS = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'gif', 'ico', 'avif', 'tiff', 'pdf']
@@ -257,7 +257,7 @@ function ImageConverter() {
       </div>
 
       {/* 拖拽上传区域 */}
-      <ImageDropzone onDrop={handleDrop} />
+      <UploadArea onDrop={handleDrop} />
 
       {/* 图片列表 */}
       {images.length > 0 && (
