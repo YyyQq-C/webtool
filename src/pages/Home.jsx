@@ -36,6 +36,15 @@ const tools = [
     path: '/web-to-pdf',
     color: 'from-purple-500 to-blue-600',
   },
+  {
+    id: 'image-watermark-remover',
+    name: '图片去水印',
+    description: '用画笔标记水印区域，AI智能去除',
+    icon: null,
+    emoji: '💧',
+    path: '/image-watermark-remover',
+    color: 'from-cyan-500 to-blue-600',
+  },
   // 未来可以添加更多工具
 ]
 

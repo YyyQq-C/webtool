@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const http = require('http');
+const multer = require('multer');
+const { spawn } = require('child_process');
 
 const app = express();
 app.use(cors());
@@ -416,6 +418,68 @@ app.post('/api/generate-pdf', async (req, res) => {
         console.error('Generate PDF error:', error);
         res.status(500).json({ error: `PDF生成失败: ${error.message}` });
     }
+});
+
+// 配置文件上传
+const upload = multer({ dest: path.join(__dirname, 'uploads') });
+
+// 确保上传目录存在
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// 去除水印
+app.post('/api/remove-watermark', upload.fields([{ name: 'image' }, { name: 'mask' }]), (req, res) => {
+    const imageFile = req.files['image']?.[0];
+    const maskFile = req.files['mask']?.[0];
+
+    if (!imageFile || !maskFile) {
+        return res.status(400).json({ error: '缺少图片或蒙版文件' });
+    }
+
+    const outputDir = path.join(__dirname, 'temp-watermark');
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true });
+    }
+
+    const outputFile = path.join(outputDir, `${Date.now()}-result.png`);
+
+    // 调用 Python 脚本进行修复
+    const pythonScript = path.join(__dirname, 'inpaint.py');
+    const pythonProcess = spawn('python3', [pythonScript, imageFile.path, maskFile.path, outputFile]);
+
+    let stdout = '';
+    let stderr = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+        // 清理上传的临时文件
+        try { fs.unlinkSync(imageFile.path); } catch (e) {}
+        try { fs.unlinkSync(maskFile.path); } catch (e) {}
+
+        if (code !== 0 || !fs.existsSync(outputFile)) {
+            console.error('Python inpaint failed:', stderr);
+            return res.status(500).json({ error: `去水印失败: ${stderr || '未知错误'}` });
+        }
+
+        // 读取结果文件并返回
+        const resultBuffer = fs.readFileSync(outputFile);
+        res.setHeader('Content-Type', 'image/png');
+        res.send(resultBuffer);
+
+        // 延迟清理结果文件
+        setTimeout(() => {
+            try { fs.unlinkSync(outputFile); } catch (e) {}
+        }, 60000);
+    });
 });
 
 const PORT = process.env.PORT || 8000;
