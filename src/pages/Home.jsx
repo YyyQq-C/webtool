@@ -27,6 +27,15 @@ const tools = [
     path: '/image-bg-remover',
     color: 'from-green-500 to-teal-600',
   },
+  {
+    id: 'web-to-pdf',
+    name: '网页转PDF',
+    description: '输入网址，将整个页面或页面图片导出为PDF',
+    icon: null,
+    emoji: '🌐',
+    path: '/web-to-pdf',
+    color: 'from-purple-500 to-blue-600',
+  },
   // 未来可以添加更多工具
 ]
 
