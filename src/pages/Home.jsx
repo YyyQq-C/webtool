@@ -15,8 +15,8 @@ const tools = [
     id: 'image-to-pdf',
     name: '图片转PDF',
     description: '多张图片合并为PDF，拖拽排序，一键生成',
-    icon: '/jpg2pdf.png',
-    path: '/image-pdf',
+    icon: '/image-pdf.png',
+    path: '/image-to-pdf',
     color: 'from-green-500 to-teal-600',
     localOnly: true, // 浏览器本地处理
   },
