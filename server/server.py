@@ -114,14 +114,15 @@ def health():
     return {"status": "ok"}
 
 @app.get("/api/stats")
-async def get_stats():
+async def get_stats(increment: bool = False):
     try:
         with open(stats_file, "r+") as f:
             data = json.load(f)
-            data["visits"] += 1
-            f.seek(0)
-            json.dump(data, f)
-            f.truncate()
+            if increment:
+                data["visits"] += 1
+                f.seek(0)
+                json.dump(data, f)
+                f.truncate()
         return data
     except Exception as e:
         print(f"Stats error: {e}")

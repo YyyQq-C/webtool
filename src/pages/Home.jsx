@@ -77,14 +77,41 @@ function Home() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      try {
-        const res = await fetch('/bg-api/api/stats')
-        if (res.ok) {
-          const data = await res.json()
-          setStats(data)
+      const CACHE_KEY = 'webtool_stats_cache'
+      const ONE_HOUR = 60 * 60 * 1000
+      const now = Date.now()
+      
+      // 1. 先尝试从本地读取缓存
+      const cached = localStorage.getItem(CACHE_KEY)
+      let cachedData = null
+      if (cached) {
+        try {
+          cachedData = JSON.parse(cached)
+          setStats({ visits: cachedData.visits })
+        } catch (e) {
+          console.error('Stats cache parse error')
         }
-      } catch (err) {
-        console.error('Failed to fetch stats:', err)
+      }
+
+      // 2. 检查是否需要向服务器请求 (如果是第一次访问，或者距离上次请求超过1小时)
+      const shouldRequest = !cachedData || (now - cachedData.timestamp > ONE_HOUR)
+      
+      if (shouldRequest) {
+        try {
+          // 只有真正间隔超过1小时才触发计数逻辑
+          const res = await fetch('/bg-api/api/stats?increment=true')
+          if (res.ok) {
+            const data = await res.json()
+            setStats(data)
+            // 更新本地缓存
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+              visits: data.visits,
+              timestamp: now
+            }))
+          }
+        } catch (err) {
+          console.error('Failed to fetch stats:', err)
+        }
       }
     }
     fetchStats()
