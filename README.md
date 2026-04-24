@@ -213,5 +213,6 @@ MIT License
 ## ☕ 赞赏支持
 
 如果您觉得这个工具有所帮助，欢迎请作者喝杯咖啡 ~
-
-![微信赞赏码](doc/wechat.jpg)
+<p align="center">
+  <img src="./doc/wechat.jpg" alt="赞赏码" width="200" />
+</p>
