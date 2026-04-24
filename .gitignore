@@ -35,3 +35,4 @@ server/cache-map.json
 
 # Script generated files
 script/*.log
+package-lock.json
