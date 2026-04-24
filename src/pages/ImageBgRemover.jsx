@@ -157,30 +157,27 @@ function ImageBgRemover() {
           <div className="flex bg-[#334155] rounded-lg overflow-hidden">
             <button
               onClick={() => setMode('browser')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'browser'
+              className={`px-4 py-2 text-sm font-medium transition-colors ${mode === 'browser'
                   ? 'bg-[#22C55E] text-[#0F172A]'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
-              }`}
+                }`}
             >
               🌐 浏览器端
             </button>
             <button
               onClick={() => setMode('server')}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                mode === 'server'
+              className={`px-4 py-2 text-sm font-medium transition-colors ${mode === 'server'
                   ? 'bg-[#22C55E] text-[#0F172A]'
                   : 'text-[#94A3B8] hover:text-[#F8FAFC]'
-              }`}
+                }`}
             >
               🖥️ 服务器端
             </button>
           </div>
-          <span className={`text-xs px-2 py-0.5 rounded ${
-            mode === 'browser'
+          <span className={`text-xs px-2 py-0.5 rounded ${mode === 'browser'
               ? 'bg-blue-500/20 text-blue-300'
               : 'bg-purple-500/20 text-purple-300'
-          }`}>
+            }`}>
             {mode === 'browser'
               ? '本地处理 · 无需上传 · 首次需下载模型'
               : '服务器处理 · 效果更好 · 文件10分钟后自动清理'}

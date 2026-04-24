@@ -11,6 +11,20 @@ function ImageEditor({ originalImage, resultImage, onSave, onCancel }) {
   const overlayRef = useRef(null)
   const containerRef = useRef(null)
 
+  // 保存到历史记录
+  const saveToHistory = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const dataUrl = canvas.toDataURL()
+    setHistory(prev => {
+      const newHistory = prev.slice(0, historyIndex + 1)
+      newHistory.push(dataUrl)
+      return newHistory.slice(-20) // 最多保留20步
+    })
+    setHistoryIndex(prev => Math.min(prev + 1, 19))
+  }, [historyIndex])
+
   // 初始化编辑器
   useEffect(() => {
     if (!resultImage || !originalImage) return
@@ -28,20 +42,6 @@ function ImageEditor({ originalImage, resultImage, onSave, onCancel }) {
     }
     img.src = resultImage
   }, [resultImage, originalImage, saveToHistory])
-
-  // 保存到历史记录
-  const saveToHistory = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const dataUrl = canvas.toDataURL()
-    setHistory(prev => {
-      const newHistory = prev.slice(0, historyIndex + 1)
-      newHistory.push(dataUrl)
-      return newHistory.slice(-20) // 最多保留20步
-    })
-    setHistoryIndex(prev => Math.min(prev + 1, 19))
-  }, [historyIndex])
 
   // 撤销
   const handleUndo = useCallback(() => {
