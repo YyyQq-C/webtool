@@ -98,12 +98,12 @@ function Home() {
           <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-32 h-32 md:w-36 md:h-36 xl:w-44 xl:h-44 object-contain shadow-2xl rounded-3xl" />
         </Link>
         <div className="flex items-center gap-3 bg-[#1E293B]/40 px-4 py-2 rounded-full border border-[#334155] backdrop-blur-md">
-           <h2 className="text-[#F8FAFC] font-bold tracking-wider text-sm">蓝胖子的工具</h2>
-           <div className="h-3 w-[1px] bg-[#334155]"></div>
-           <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse"></span>
-              <span className="text-[#94A3B8] font-mono text-xs font-bold">{stats.visits.toLocaleString()}</span>
-           </div>
+          <h2 className="text-[#F8FAFC] font-bold tracking-wider text-sm">蓝胖子的工具</h2>
+          <div className="h-3 w-[1px] bg-[#334155]"></div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse"></span>
+            <span className="text-[#94A3B8] font-mono text-xs font-bold">{"累计访问: " + stats.visits.toLocaleString()}</span>
+          </div>
         </div>
       </div>
 
