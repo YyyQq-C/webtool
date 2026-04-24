@@ -21,6 +21,16 @@ const tools = [
     localOnly: true, // 浏览器本地处理
   },
   {
+    id: 'image-cropper',
+    name: '图片裁剪',
+    description: '自由裁剪、比例裁剪、旋转图片',
+    icon: null,
+    emoji: '📐',
+    path: '/image-cropper',
+    color: 'from-orange-500 to-red-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
@@ -69,26 +79,37 @@ function Home() {
             to={tool.path}
             className="group block"
           >
-            <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-[200px] flex flex-col">
+            <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-auto min-h-[220px] flex flex-col relative overflow-hidden">
+              {/* 背景装饰 */}
+              <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${tool.color} opacity-10 blur-2xl rounded-full group-hover:opacity-20 transition-opacity`}></div>
+              
+              <div className="flex items-start justify-between mb-4">
+                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
+                  {tool.icon ? (
+                    <img src={tool.icon} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
+                  ) : (
+                    <span>{tool.emoji}</span>
+                  )}
+                </div>
+                {tool.localOnly && (
+                  <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded-md">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                    <span>无损本地</span>
+                  </div>
+                )}
+              </div>
+
               {/* 标题 */}
-              <h3 className="text-xl font-semibold text-[#F8FAFC] mb-2 line-clamp-1 flex-shrink-0">
+              <h3 className="text-xl font-bold text-[#F8FAFC] mb-2 group-hover:text-[#22C55E] transition-colors">
                 {tool.name}
               </h3>
 
               {/* 描述 */}
-              <p className="text-[#94A3B8] text-sm line-clamp-2 flex-shrink-0">
+              <p className="text-[#94A3B8] text-sm leading-relaxed mb-4">
                 {tool.description}
               </p>
-
-              {/* 本地处理标识 */}
-              {tool.localOnly && (
-                <div className="mt-2 flex items-center gap-1 text-xs text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded-full flex-shrink-0">
-                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                  <span>浏览器本地处理</span>
-                </div>
-              )}
 
               {/* 底部箭头 */}
               <div className="mt-auto pt-4 flex items-center text-[#22C55E] group-hover:text-[#10B981]">
