@@ -127,6 +127,14 @@ def remove_watermark(image_path, mask_path, output_path):
         if mask is None:
             raise RuntimeError("Failed to read mask")
 
+        # OpenCV inpaint 仅支持 1 通道或 3 通道图像。如果有 Alpha 通道，分离它。
+        has_alpha = False
+        alpha_channel = None
+        if len(img.shape) == 3 and img.shape[2] == 4:
+            has_alpha = True
+            alpha_channel = img[:, :, 3]
+            img = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+
         _, mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
 
         # 扩展 mask 边缘，使修复更自然
@@ -163,6 +171,10 @@ def remove_watermark(image_path, mask_path, output_path):
         mask_multi = cv2.merge([mask] * num_channels)
         mask_inv = cv2.bitwise_not(mask_multi)
         final = cv2.bitwise_and(img, mask_inv) + cv2.bitwise_and(result, mask_multi)
+
+        if has_alpha:
+            final = cv2.cvtColor(final, cv2.COLOR_BGR2BGRA)
+            final[:, :, 3] = alpha_channel
 
         cv2.imwrite(output_path, final)
         print("Success")
