@@ -16,7 +16,7 @@ const tools = [
     name: '图片转PDF',
     description: '多张图片合并为PDF，拖拽排序，一键生成',
     icon: '/jpg2pdf.png',
-    path: '/image-to-pdf',
+    path: '/image-pdf',
     color: 'from-green-500 to-teal-600',
     localOnly: true, // 浏览器本地处理
   },
@@ -80,7 +80,7 @@ function Home() {
       const CACHE_KEY = 'webtool_stats_cache'
       const ONE_HOUR = 60 * 60 * 1000
       const now = Date.now()
-      
+
       // 1. 先尝试从本地读取缓存
       const cached = localStorage.getItem(CACHE_KEY)
       let cachedData = null
@@ -95,7 +95,7 @@ function Home() {
 
       // 2. 检查是否需要向服务器请求 (如果是第一次访问，或者距离上次请求超过1小时)
       const shouldRequest = !cachedData || (now - cachedData.timestamp > ONE_HOUR)
-      
+
       if (shouldRequest) {
         try {
           // 只有真正间隔超过1小时才触发计数逻辑
