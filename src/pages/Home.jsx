@@ -60,6 +60,16 @@ const tools = [
     color: 'from-cyan-500 to-blue-600',
     localOnly: false, // 需要服务器处理
   },
+  {
+    id: 'image-resizer',
+    name: '分辨率调整',
+    description: '批量修改图片宽高，支持等比例缩放',
+    icon: null,
+    emoji: '📏',
+    path: '/image-resizer',
+    color: 'from-pink-500 to-rose-600',
+    localOnly: true,
+  },
 ]
 
 function Home() {

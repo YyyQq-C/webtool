@@ -6,6 +6,7 @@ import ImageBgRemover from './pages/ImageBgRemover'
 import WebToPdf from './pages/WebToPdf'
 import ImageWatermarkRemover from './pages/ImageWatermarkRemover'
 import ImageCropper from './pages/ImageCropper'
+import ImageResizer from './pages/ImageResizer'
 import Footer from './components/Footer'
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
             <Route path="/image-bg-remover" element={<ImageBgRemover />} />
             <Route path="/image-watermark-remover" element={<ImageWatermarkRemover />} />
             <Route path="/image-cropper" element={<ImageCropper />} />
+            <Route path="/image-resizer" element={<ImageResizer />} />
           </Routes>
         </main>
         <Footer />
