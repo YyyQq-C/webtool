@@ -87,18 +87,23 @@ function Home() {
       if (cached) {
         try {
           cachedData = JSON.parse(cached)
-          setStats({ visits: cachedData.visits })
+          // 如果缓存有数据且 visits > 0，先显示缓存值
+          if (cachedData.visits > 0) {
+            setStats({ visits: cachedData.visits })
+          }
         } catch (e) {
           console.error('Stats cache parse error')
+          cachedData = null
         }
       }
 
-      // 2. 检查是否需要向服务器请求 (如果是第一次访问，或者距离上次请求超过1小时)
-      const shouldRequest = !cachedData || (now - cachedData.timestamp > ONE_HOUR)
+      // 2. 检查是否需要向服务器请求
+      // 条件：缓存不存在 || 缓存的visits为0 || 超过1小时
+      const needsRequest = !cachedData || cachedData.visits === 0 || (now - cachedData.timestamp > ONE_HOUR)
 
-      if (shouldRequest) {
+      if (needsRequest) {
         try {
-          // 只有真正间隔超过1小时才触发计数逻辑
+          // 首次访问或缓存过期时，请求服务器并计数
           const res = await fetch('/bg-api/api/stats?increment=true')
           if (res.ok) {
             const data = await res.json()
@@ -111,6 +116,10 @@ function Home() {
           }
         } catch (err) {
           console.error('Failed to fetch stats:', err)
+          // 如果请求失败但缓存有值，继续显示缓存
+          if (cachedData && cachedData.visits > 0) {
+            setStats({ visits: cachedData.visits })
+          }
         }
       }
     }
