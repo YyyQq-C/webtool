@@ -13,6 +13,7 @@ from typing import List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, Body, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 from playwright.async_api import async_playwright
@@ -108,6 +109,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Docker 模式：挂载前端静态文件
+# 当 dist 目录存在时，FastAPI 直接服务前端
+DIST_DIR = pwd / "dist"  # 前端构建产物（Docker 中在同目录）
+if DIST_DIR.exists() and (DIST_DIR / "index.html").exists():
+    # 挂载 assets 目录
+    if (DIST_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=DIST_DIR / "assets"), name="assets")
+    # 其他静态资源
+    app.mount("/", StaticFiles(directory=DIST_DIR, html=True), name="static")
+    print(f"[DOCKER] 前端静态文件已挂载: {DIST_DIR}")
 
 @app.get("/health")
 def health():

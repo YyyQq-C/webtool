@@ -1,0 +1,60 @@
+# Docker 构建忽略文件
+# 减少构建上下文大小
+
+# Node.js
+node_modules/
+npm-debug.log*
+.pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.ipynb_checkpoints/
+
+# 构建产物 (会在 Docker 内重新构建)
+dist/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker/
+
+# 临时文件
+server/temp/
+server/uploads/
+server/temp-bg/
+server/temp-watermark/
+server/cache/
+server/*.json
+
+# 日志
+*.log
+logs/
+
+# 测试
+coverage/
+.nyc_output/
+
+# 文档
+*.md
+doc/
+LICENSE
+
+# 其他
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp

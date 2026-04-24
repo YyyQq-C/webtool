@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  webtool:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: webtool:latest
+    container_name: webtool
+    ports:
+      - "10010:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # 持久化临时文件（可选）
+      - webtool-temp:/app/temp
+      - webtool-uploads:/app/uploads
+      # Playwright 缓存（避免每次重启重新下载浏览器）
+      - webtool-playwright:/ms/playwright
+      # rembg 模型缓存（u2net ~167MB）
+      - webtool-u2net:/root/.u2net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  webtool-temp:
+  webtool-uploads:
+  webtool-playwright:
+  webtool-u2net:
+
+networks:
+  default:
+    name: webtool-network
