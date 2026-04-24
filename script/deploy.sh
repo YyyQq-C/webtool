@@ -12,10 +12,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# 项目路径
-PROJECT_DIR="/data/tool"
+# 项目路径（使用相对路径，脚本在 script/ 目录下）
+SCRIPT_DIR="$(cd "$(dirname "$BASH_SOURCE")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 SERVER_DIR="$PROJECT_DIR/server"
-SCRIPT_DIR="$PROJECT_DIR/script"
 SERVER_SCRIPT_DIR="$SERVER_DIR/script"
 DIST_DIR="$PROJECT_DIR/dist"
 LOG_FILE="/tmp/deploy.log"

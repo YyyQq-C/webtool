@@ -2,7 +2,8 @@
 # 服务器启动脚本 - 使用 Node.js + Puppeteer
 set -e
 
-SERVER_DIR="/data/tool/server"
+# 使用相对路径
+SERVER_DIR="$(cd "$(dirname "$BASH_SOURCE")" && pwd)"
 PID_FILE="/tmp/node-server.pid"
 LOG_FILE="/tmp/node-server.log"
 PORT=8000

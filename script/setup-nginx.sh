@@ -2,7 +2,11 @@
 # Nginx 配置安装脚本
 set -e
 
-CONF_TEMPLATE="/data/tool/nginx.conf.template"
+# 使用相对路径
+SCRIPT_DIR="$(cd "$(dirname "$BASH_SOURCE")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+CONF_TEMPLATE="$PROJECT_DIR/nginx.conf.template"
 NGINX_SITES_AVAILABLE="/etc/nginx/sites-available/tool.conf"
 NGINX_SITES_ENABLED="/etc/nginx/sites-enabled/tool.conf"
 DEFAULT_CONF="/etc/nginx/sites-enabled/default"
