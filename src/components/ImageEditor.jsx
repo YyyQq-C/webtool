@@ -154,7 +154,7 @@ function ImageEditor({ originalImage, resultImage, onSave, onCancel }) {
     return `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') ${center} ${center}, crosshair`;
   }, [brushSize])
 
-
+  return (
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
       {/* 顶部工具栏 */}
       <div className="bg-[#1E293B] border-b border-[#475569] p-4">
