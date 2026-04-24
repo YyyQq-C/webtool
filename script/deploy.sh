@@ -42,11 +42,6 @@ info() {
 check_dependencies() {
     log "检查依赖环境..."
     
-    # Node.js
-    command -v node &>/dev/null || error "Node.js 未安装"
-    NODE_VERSION=$(node -v)
-    info "Node.js 版本: $NODE_VERSION"
-    
     # npm
     command -v npm &>/dev/null || error "npm 未安装"
     
@@ -74,22 +69,7 @@ install_frontend_deps() {
     fi
 }
 
-# 安装后端 Node.js 依赖
-install_backend_node_deps() {
-    if [ -d "$SERVER_DIR" ]; then
-        if [ ! -d "$SERVER_DIR/node_modules" ]; then
-            log "安装后端 Node.js 依赖..."
-            cd "$SERVER_DIR"
-            # 跳过 Puppeteer Chrome 下载（已缓存）
-            PUPPETEER_SKIP_DOWNLOAD=true npm install 2>&1 | tee -a "$LOG_FILE" || error "后端 Node.js 依赖安装失败"
-            log "后端 Node.js 依赖安装完成 ✓"
-        else
-            info "后端 Node.js 依赖已存在，跳过安装"
-        fi
-    fi
-}
-
-# 安装 Python 依赖
+# 安装 Python 依赖及浏览器
 install_python_deps() {
     if ! command -v pip3 &>/dev/null; then
         warn "pip3 未安装，跳过 Python 依赖"
@@ -101,24 +81,17 @@ install_python_deps() {
     if [ -f "$REQUIREMENTS_FILE" ]; then
         log "安装 Python 依赖..."
         
-        # 检查是否需要安装
-        local needs_install=false
+        # 始终运行安装以确保依赖最新
+        pip3 install -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
+            warn "部分 Python 模块安装失败，尝试单独安装核心模块..."
+            pip3 install rembg Pillow opencv-python-headless fastapi uvicorn playwright httpx 2>&1 | tee -a "$LOG_FILE" || warn "核心模块安装失败"
+        }
         
-        # 检查核心模块
-        python3 -c "import rembg" 2>/dev/null || needs_install=true
-        python3 -c "import cv2" 2>/dev/null || needs_install=true
-        python3 -c "import PIL" 2>/dev/null || needs_install=true
+        # 安装 Playwright 浏览器
+        log "安装 Playwright 浏览器..."
+        playwright install chromium 2>&1 | tee -a "$LOG_FILE" || warn "Playwright 浏览器安装失败"
         
-        if [ "$needs_install" = true ]; then
-            log "开始安装 Python 模块..."
-            pip3 install -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
-                warn "部分 Python 模块安装失败，尝试单独安装核心模块..."
-                pip3 install rembg Pillow opencv-python-headless 2>&1 | tee -a "$LOG_FILE" || warn "核心模块安装失败"
-            }
-            log "Python 依赖安装完成 ✓"
-        else
-            info "Python 核心模块已存在，跳过安装"
-        fi
+        log "Python 依赖及浏览器安装完成 ✓"
     else
         warn "requirements.txt 不存在，跳过 Python 依赖"
     fi
@@ -169,17 +142,11 @@ restart_nginx() {
 stop_backend() {
     log "停止旧的后端服务..."
     
-    # 停止 Node.js 服务
-    if pgrep -f "node node-server.js" > /dev/null; then
-        pkill -f "node node-server.js" 2>/dev/null || true
+    # 停止 Python 服务
+    if pgrep -f "python3 server.py" > /dev/null; then
+        pkill -f "python3 server.py" 2>/dev/null || true
         sleep 2
-        log "Node.js 服务已停止"
-    fi
-    
-    # 停止旧的 uvicorn 服务（如果有）
-    if pgrep -f "uvicorn main:app.*8000" > /dev/null; then
-        pkill -f "uvicorn main:app.*8000" 2>/dev/null || true
-        sleep 2
+        log "Python 后端服务已停止"
     fi
 }
 
@@ -190,7 +157,7 @@ start_backend() {
         return
     fi
     
-    log "启动后端服务 (Node.js + Puppeteer)..."
+    log "启动后端服务 (Python 3 + Playwright)..."
     
     cd "$SERVER_DIR"
     
@@ -200,7 +167,7 @@ start_backend() {
     else
         # 直接启动
         PORT=8000
-        nohup node node-server.js > /tmp/node-server.log 2>&1 &
+        nohup python3 server.py > /tmp/python-server.log 2>&1 &
         sleep 3
         
         # 验证
@@ -208,7 +175,7 @@ start_backend() {
             log "后端服务启动成功 ✓"
         else
             warn "后端服务可能启动失败"
-            tail -10 /tmp/node-server.log | tee -a "$LOG_FILE"
+            tail -10 /tmp/python-server.log | tee -a "$LOG_FILE"
         fi
     fi
 }
@@ -253,11 +220,11 @@ show_info() {
     echo ""
     echo "🔧 服务状态:"
     echo "   - 前端 (Nginx): 端口 10010"
-    echo "   - 后端 (Node):  端口 8000"
+    echo "   - 后端 (Python): 端口 8000"
     echo ""
     echo "📝 常用命令:"
     echo "   - 重启后端: $SERVER_DIR/stop.sh && $SERVER_DIR/start.sh"
-    echo "   - 查看日志: tail -f /tmp/node-server.log"
+    echo "   - 查看日志: tail -f /tmp/python-server.log"
     echo "========================================"
     echo ""
 }
@@ -272,7 +239,6 @@ main() {
 
     check_dependencies
     install_frontend_deps
-    install_backend_node_deps
     install_python_deps
     build_frontend
     restart_nginx

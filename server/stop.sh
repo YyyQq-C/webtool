@@ -1,7 +1,7 @@
 #!/bin/bash
-# 服务器停止脚本
+# 服务器停止脚本 - Python版
 
-PID_FILE="/tmp/node-server.pid"
+PID_FILE="/tmp/python-server.pid"
 PORT=8000
 
 echo "🛑 停止去背景后端服务..."
