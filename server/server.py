@@ -29,6 +29,12 @@ TEMP_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR = pwd / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# 网站访问数据统计
+stats_file = pwd / "stats.json"
+if not stats_file.exists():
+    with open(stats_file, "w") as f:
+        json.dump({"visits": 0, "startTime": int(time.time() * 1000)}, f)
+
 # URL缓存映射：urlHash -> sessionId（仅图片模式）
 url_cache = {}
 # 存储会话数据
@@ -106,6 +112,20 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.get("/api/stats")
+async def get_stats():
+    try:
+        with open(stats_file, "r+") as f:
+            data = json.load(f)
+            data["visits"] += 1
+            f.seek(0)
+            json.dump(data, f)
+            f.truncate()
+        return data
+    except Exception as e:
+        print(f"Stats error: {e}")
+        return {"visits": 0, "startTime": 0}
 
 @app.get("/api/fetch-page")
 async def fetch_page(url: str):
