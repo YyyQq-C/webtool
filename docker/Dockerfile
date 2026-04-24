@@ -83,8 +83,9 @@ COPY server/script/ ./script/
 # 从第一阶段复制前端构建产物
 COPY --from=frontend-builder /app/frontend/dist ./dist
 
-# 创建临时目录
-RUN mkdir -p temp uploads temp-bg temp-watermark stats.json
+# 创建临时目录和初始化统计文件
+RUN mkdir -p temp uploads temp-bg temp-watermark && \
+    echo '{"visits":0,"startTime":0}' > stats.json
 
 # 暴露端口
 EXPOSE 8000

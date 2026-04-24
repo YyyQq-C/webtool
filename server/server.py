@@ -32,9 +32,32 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # 网站访问数据统计
 stats_file = pwd / "stats.json"
-if not stats_file.exists():
-    with open(stats_file, "w") as f:
-        json.dump({"visits": 0, "startTime": int(time.time() * 1000)}, f)
+
+def init_stats_file():
+    """初始化统计文件，确保存在且有正确格式"""
+    try:
+        if not stats_file.exists():
+            with open(stats_file, "w") as f:
+                json.dump({"visits": 0, "startTime": int(time.time() * 1000)}, f)
+            print(f"[INIT] 创建统计文件: {stats_file}")
+        else:
+            # 验证文件内容
+            with open(stats_file, "r") as f:
+                data = json.load(f)
+                if "visits" not in data or "startTime" not in data:
+                    with open(stats_file, "w") as f:
+                        json.dump({"visits": 0, "startTime": int(time.time() * 1000)}, f)
+                    print(f"[INIT] 修复统计文件格式")
+    except Exception as e:
+        print(f"[ERROR] 统计文件初始化失败: {e}")
+        # 尝试重新创建
+        try:
+            with open(stats_file, "w") as f:
+                json.dump({"visits": 0, "startTime": int(time.time() * 1000)}, f)
+        except:
+            pass
+
+init_stats_file()
 
 # URL缓存映射：urlHash -> sessionId（仅图片模式）
 url_cache = {}

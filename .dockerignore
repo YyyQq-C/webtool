@@ -38,7 +38,9 @@ server/uploads/
 server/temp-bg/
 server/temp-watermark/
 server/cache/
-server/*.json
+# 排除临时 json 但保留 stats.json
+server/stats.json
+server/cache-map.json
 
 # 日志
 *.log
