@@ -1,19 +1,50 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import Cropper from 'react-easy-crop'
+import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
 import { saveAs } from 'file-saver'
 import UploadArea, { isImageFile } from '../components/UploadArea'
-import getCroppedImg from '../utils/cropImage'
+
+// 辅助函数：将 canvas 转换为 Blob
+function canvasToBlob(canvas) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      resolve(blob)
+    }, 'image/png')
+  })
+}
 
 function ImageCropper() {
   const [image, setImage] = useState(null)
-  const [crop, setCrop] = useState({ x: 0, y: 0 })
-  const [zoom, setZoom] = useState(1)
+  const [crop, setCrop] = useState()
+  const [completedCrop, setCompletedCrop] = useState()
+  const [aspect, setAspect] = useState(undefined)
   const [rotation, setRotation] = useState(0)
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null)
-  const [aspect, setAspect] = useState(undefined) // undefined means free aspect ratio
-
+  const [scale, setScale] = useState(1)
+  
+  const imgRef = useRef(null)
   const [uploadError, setUploadError] = useState('')
+
+  // 默认初始裁剪区域
+  function onImageLoad(e) {
+    const { width, height } = e.currentTarget
+    if (aspect) {
+        const newCrop = centerCrop(
+            makeAspectCrop(
+              {
+                unit: '%',
+                width: 90,
+              },
+              aspect,
+              width,
+              height,
+            ),
+            width,
+            height,
+          )
+        setCrop(newCrop)
+    }
+  }
 
   const handleFile = useCallback((file) => {
     setUploadError('')
@@ -36,39 +67,106 @@ function ImageCropper() {
     if (acceptedFiles.length > 0) handleFile(acceptedFiles[0])
   }, [handleFile])
 
-  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels)
-  }, [])
+  const downloadCroppedImage = async () => {
+    if (!completedCrop || !imgRef.current) return
 
-  const showCroppedImage = async () => {
-    try {
-      const croppedImage = await getCroppedImg(
-        image.preview,
-        croppedAreaPixels,
-        rotation
-      )
-      const name = image.name.replace(/\.[^/.]+$/, '')
-      saveAs(croppedImage, `${name}-cropped.png`)
-    } catch (e) {
-      console.error(e)
+    const image = imgRef.current
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    if (!ctx) return
+
+    const scaleX = image.naturalWidth / image.width
+    const scaleY = image.naturalHeight / image.height
+    const pixelRatio = window.devicePixelRatio
+
+    canvas.width = Math.floor(completedCrop.width * scaleX * pixelRatio)
+    canvas.height = Math.floor(completedCrop.height * scaleY * pixelRatio)
+
+    ctx.scale(pixelRatio, pixelRatio)
+    ctx.imageSmoothingQuality = 'high'
+
+    const cropX = completedCrop.x * scaleX
+    const cropY = completedCrop.y * scaleY
+
+    const rotateRads = (rotation * Math.PI) / 180
+    const centerX = image.naturalWidth / 2
+    const centerY = image.naturalHeight / 2
+
+    ctx.save()
+
+    // 1. 移动到画布中心进行旋转和缩放
+    ctx.translate(-cropX * pixelRatio, -cropY * pixelRatio)
+    ctx.translate(centerX * pixelRatio, centerY * pixelRatio)
+    ctx.rotate(rotateRads)
+    ctx.scale(scale, scale)
+    ctx.translate(-centerX * pixelRatio, -centerY * pixelRatio)
+    
+    // 2. 绘制原始尺寸图片
+    ctx.drawImage(
+      image,
+      0,
+      0,
+      image.naturalWidth,
+      image.naturalHeight,
+      0,
+      0,
+      image.naturalWidth * pixelRatio,
+      image.naturalHeight * pixelRatio
+    )
+
+    ctx.restore()
+
+    const blob = await canvasToBlob(canvas)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      const name = image.name || 'cropped-image'
+      saveAs(url, `${name.replace(/\.[^/.]+$/, '')}-cropped.png`)
+      URL.revokeObjectURL(url)
     }
   }
 
   const clearAll = () => {
     if (image?.preview) URL.revokeObjectURL(image.preview)
     setImage(null)
+    setCrop(undefined)
+    setCompletedCrop(undefined)
     setRotation(0)
-    setZoom(1)
+    setScale(1)
     setAspect(undefined)
   }
 
   const aspectRatios = [
-    { label: '自由', value: undefined },
+    { label: '自由选择', value: undefined },
     { label: '1:1', value: 1 / 1 },
     { label: '4:3', value: 4 / 3 },
     { label: '16:9', value: 16 / 9 },
     { label: '3:2', value: 3 / 2 },
   ]
+
+  const handleAspectChange = (newAspect) => {
+    setAspect(newAspect)
+    if (newAspect && imgRef.current) {
+        const { width, height } = imgRef.current
+        const newCrop = centerCrop(
+            makeAspectCrop(
+              {
+                unit: '%',
+                width: 90,
+              },
+              newAspect,
+              width,
+              height,
+            ),
+            width,
+            height,
+          )
+        setCrop(newCrop)
+    } else {
+        // 如果切回自由选择，保持当前位置但不再受锁定
+        setCrop(prev => ({ ...prev, aspect: undefined }))
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -79,9 +177,9 @@ function ImageCropper() {
         返回工具列表
       </Link>
 
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent mb-2">图片裁剪工具</h1>
-        <p className="text-[#94A3B8]">自由裁剪、比例裁剪、旋转图片，由于是本地处理，您的隐私完全保密</p>
+      <div className="text-center mb-8 font-sans">
+        <h1 className="text-4xl font-black bg-gradient-to-r from-emerald-400 to-cyan-500 bg-clip-text text-transparent mb-3 tracking-tight">智能图片裁剪</h1>
+        <p className="text-[#94A3B8] text-lg font-medium">支持鼠标自由拖拽选择区域，精准每一像素的处理</p>
       </div>
 
       {!image ? (
@@ -93,41 +191,50 @@ function ImageCropper() {
           onFileSelect={handleFile}
         />
       ) : (
-        <div className="bg-[#1E293B]/60 backdrop-blur-md rounded-2xl border border-[#475569] p-6 shadow-xl animate-in fade-in zoom-in duration-300">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* 裁剪区域 */}
-            <div className="flex-1">
-              <div className="relative h-[500px] w-full rounded-xl overflow-hidden bg-[#0F172A] border border-[#334155]">
-                <Cropper
-                  image={image.preview}
+        <div className="bg-[#1E293B]/80 backdrop-blur-xl rounded-3xl border border-[#475569] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-[#475569]">
+            {/* 交互裁剪区 */}
+            <div className="flex-1 p-8 bg-[#0F172A]/50 min-h-[500px] flex items-center justify-center relative">
+              <div className="relative group">
+                <ReactCrop
                   crop={crop}
-                  zoom={zoom}
+                  onChange={(_, percentCrop) => setCrop(percentCrop)}
+                  onComplete={(c) => setCompletedCrop(c)}
                   aspect={aspect}
-                  rotation={rotation}
-                  onCropChange={setCrop}
-                  onCropComplete={onCropComplete}
-                  onZoomChange={setZoom}
-                  onRotationChange={setRotation}
-                />
+                  className="max-w-full rounded-lg shadow-2xl"
+                  style={{ maxHeight: '70vh' }}
+                >
+                  <img
+                    ref={imgRef}
+                    alt="Crop me"
+                    src={image.preview}
+                    style={{ transform: `scale(${scale}) rotate(${rotation}deg)` }}
+                    onLoad={onImageLoad}
+                    className="max-w-full block"
+                  />
+                </ReactCrop>
+              </div>
+
+              {/* 悬浮快捷提示 */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10 text-xs text-white/80 pointer-events-none">
+                💡 鼠标拖拽图片边缘可自由调整裁剪范围
               </div>
             </div>
 
             {/* 控制面板 */}
-            <div className="w-full lg:w-80 flex flex-col gap-6">
+            <div className="w-full lg:w-96 p-8 bg-[#1E293B] flex flex-col gap-8">
+              {/* 模式选择 */}
               <div>
-                <h3 className="text-[#F8FAFC] font-semibold mb-3 flex items-center">
-                  <span className="w-1.5 h-6 bg-blue-500 rounded-full mr-2"></span>
-                  比例选择
-                </h3>
-                <div className="grid grid-cols-3 gap-2">
+                <label className="text-xs uppercase tracking-widest font-bold text-emerald-500 mb-4 block">常用尺寸比例</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {aspectRatios.map((ratio) => (
                     <button
                       key={ratio.label}
-                      onClick={() => setAspect(ratio.value)}
-                      className={`py-2 px-3 rounded-lg text-sm transition-all border ${
+                      onClick={() => handleAspectChange(ratio.value)}
+                      className={`py-3 px-2 rounded-xl text-xs font-bold transition-all border ${
                         aspect === ratio.value
-                          ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-500/20'
-                          : 'bg-[#334155] border-[#475569] text-[#94A3B8] hover:border-blue-400/50'
+                          ? 'bg-emerald-500 border-emerald-400 text-[#0F172A] shadow-lg shadow-emerald-500/20'
+                          : 'bg-[#0F172A]/40 border-[#475569] text-[#94A3B8] hover:border-emerald-400/50'
                       }`}
                     >
                       {ratio.label}
@@ -136,91 +243,78 @@ function ImageCropper() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="text-[#F8FAFC] font-semibold mb-3 flex items-center">
-                  <span className="w-1.5 h-6 bg-indigo-500 rounded-full mr-2"></span>
-                  缩放: {zoom.toFixed(1)}x
-                </h3>
-                <input
-                  type="range"
-                  min={1}
-                  max={3}
-                  step={0.1}
-                  value={zoom}
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                  className="w-full accent-blue-500 h-2 bg-[#334155] rounded-lg appearance-none cursor-pointer"
-                />
-              </div>
+              {/* 编辑滑块 */}
+              <div className="space-y-6">
+                <div>
+                   <div className="flex justify-between items-center mb-3">
+                    <label className="text-xs font-bold text-[#F8FAFC]">缩放比例</label>
+                    <span className="text-xs font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">{scale.toFixed(2)}x</span>
+                   </div>
+                   <input
+                    type="range"
+                    min={0.1}
+                    max={2}
+                    step={0.01}
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="w-full accent-emerald-500 h-1.5 bg-[#0F172A] rounded-lg appearance-none cursor-pointer"
+                  />
+                </div>
 
-              <div>
-                <h3 className="text-[#F8FAFC] font-semibold mb-3 flex items-center">
-                  <span className="w-1.5 h-6 bg-purple-500 rounded-full mr-2"></span>
-                  旋转: {rotation}°
-                </h3>
-                <input
-                  type="range"
-                  min={0}
-                  max={360}
-                  step={1}
-                  value={rotation}
-                  onChange={(e) => setRotation(Number(e.target.value))}
-                  className="w-full accent-indigo-500 h-2 bg-[#334155] rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between mt-2">
-                    <button onClick={() => setRotation((r) => (r - 90 + 360) % 360)} className="text-xs text-[#94A3B8] hover:text-white px-2 py-1 rounded bg-[#334155]">左转 90°</button>
-                    <button onClick={() => setRotation((r) => (r + 90) % 360)} className="text-xs text-[#94A3B8] hover:text-white px-2 py-1 rounded bg-[#334155]">右转 90°</button>
+                <div>
+                   <div className="flex justify-between items-center mb-3">
+                    <label className="text-xs font-bold text-[#F8FAFC]">旋转角度</label>
+                    <span className="text-xs font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">{rotation}°</span>
+                   </div>
+                   <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    step={1}
+                    value={rotation}
+                    onChange={(e) => setRotation(Number(e.target.value))}
+                    className="w-full accent-emerald-500 h-1.5 bg-[#0F172A] rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex gap-2 mt-4">
+                    <button 
+                       onClick={() => setRotation((r) => (r - 90 + 360) % 360)}
+                       className="flex-1 py-2 bg-[#0F172A] hover:bg-[#334155] border border-[#475569] rounded-lg text-[10px] text-white font-bold transition-all"
+                    >
+                       左旋 90°
+                    </button>
+                    <button 
+                       onClick={() => setRotation((r) => (r + 90) % 360)}
+                       className="flex-1 py-2 bg-[#0F172A] hover:bg-[#334155] border border-[#475569] rounded-lg text-[10px] text-white font-bold transition-all"
+                    >
+                       右旋 90°
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-auto flex flex-col gap-3">
+              {/* 底部按钮 */}
+              <div className="mt-6 space-y-4">
                 <button
-                  onClick={showCroppedImage}
-                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98]"
+                  disabled={!completedCrop}
+                  onClick={downloadCroppedImage}
+                  className="w-full py-5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-[#0F172A] text-sm font-black rounded-2xl shadow-xl shadow-emerald-500/20 transition-all transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:grayscale disabled:transform-none"
                 >
-                  导出裁剪图片
+                  确认并导出裁剪图片
                 </button>
                 <button
                   onClick={clearAll}
-                  className="w-full py-3 bg-[#1E293B] hover:bg-[#334155] text-[#94A3B8] hover:text-white rounded-xl border border-[#475569] transition-all"
+                  className="w-full py-4 bg-[#0F172A] hover:bg-[#DC2626]/10 text-[#94A3B8] hover:text-red-400 text-xs font-bold rounded-2xl border border-[#475569] hover:border-red-400/50 transition-all flex items-center justify-center gap-2"
                 >
-                  重选图片
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  重置画布
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* 说明区域 */}
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#1E293B]/40 p-6 rounded-2xl border border-[#475569]">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center text-blue-500 mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h3 className="text-[#F8FAFC] font-semibold mb-2">安全隐私</h3>
-          <p className="text-[#94A3B8] text-sm leading-relaxed">基于浏览器本地 Canvas 技术处理图片，所有操作均在您的电脑上完成，图片绝不上传任何服务器。</p>
-        </div>
-        <div className="bg-[#1E293B]/40 p-6 rounded-2xl border border-[#475569]">
-          <div className="w-10 h-10 bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-500 mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            </svg>
-          </div>
-          <h3 className="text-[#F8FAFC] font-semibold mb-2">灵活比例</h3>
-          <p className="text-[#94A3B8] text-sm leading-relaxed">预设多种常用社交媒体及文档比例，支持自由拉伸调整，满足不同场景下的尺寸需求。</p>
-        </div>
-        <div className="bg-[#1E293B]/40 p-6 rounded-2xl border border-[#475569]">
-          <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center text-purple-500 mb-4">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </div>
-          <h3 className="text-[#F8FAFC] font-semibold mb-2">精细旋转</h3>
-          <p className="text-[#94A3B8] text-sm leading-relaxed">支持 360 度任意角度旋转调节，可修正拍摄倾斜的图片，边缘自动对齐裁切。</p>
-        </div>
-      </div>
     </div>
   )
 }
