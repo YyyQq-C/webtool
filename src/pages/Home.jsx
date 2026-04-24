@@ -78,7 +78,7 @@ function Home() {
       {/* 顶部图标 */}
       <div className="flex justify-center md:justify-start mb-8 md:mb-12">
         <Link to="/" className="hover:opacity-80 transition-opacity">
-          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-40 md:w-56 h-auto object-contain" />
+          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-32 h-32 object-contain" />
         </Link>
       </div>
 
@@ -92,7 +92,7 @@ function Home() {
             <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-auto min-h-[220px] flex flex-col relative overflow-hidden">
               {/* 背景装饰 */}
               <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${tool.color} opacity-10 blur-2xl rounded-full group-hover:opacity-20 transition-opacity`}></div>
-              
+
               <div className="flex items-start justify-between mb-4">
                 <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
                   {tool.icon ? (
