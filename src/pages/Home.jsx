@@ -74,66 +74,66 @@ const tools = [
 
 function Home() {
   return (
-    <div className="container mx-auto px-4 py-12">
-      {/* 顶部图标 */}
-      <div className="flex justify-center md:justify-start mb-8 md:mb-12">
+    <div className="container mx-auto px-4 py-12 flex flex-col xl:flex-row items-center xl:items-start gap-12">
+      {/* 顶部/左侧图标 */}
+      <div className="xl:flex-shrink-0 xl:sticky xl:top-12">
         <Link to="/" className="hover:opacity-80 transition-opacity">
-          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-32 h-32 object-contain" />
+          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-32 h-32 md:w-40 md:h-40 xl:w-44 xl:h-44 object-contain" />
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-        {tools.map((tool) => (
-          <Link
-            key={tool.id}
-            to={tool.path}
-            className="group block"
-          >
-            <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-auto min-h-[220px] flex flex-col relative overflow-hidden">
-              {/* 背景装饰 */}
-              <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${tool.color} opacity-10 blur-2xl rounded-full group-hover:opacity-20 transition-opacity`}></div>
+      <div className="flex-grow w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {tools.map((tool) => (
+            <Link
+              key={tool.id}
+              to={tool.path}
+              className="group block"
+            >
+              <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-auto min-h-[220px] flex flex-col relative overflow-hidden">
+                {/* 背景装饰 */}
+                <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${tool.color} opacity-10 blur-2xl rounded-full group-hover:opacity-20 transition-opacity`}></div>
 
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
-                  {tool.icon ? (
-                    <img src={tool.icon} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
-                  ) : (
-                    <span>{tool.emoji}</span>
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
+                    {tool.icon ? (
+                      <img src={tool.icon} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
+                    ) : (
+                      <span>{tool.emoji}</span>
+                    )}
+                  </div>
+                  {tool.localOnly && (
+                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded-md">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                      </svg>
+                      <span>无损本地</span>
+                    </div>
                   )}
                 </div>
-                {tool.localOnly && (
-                  <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded-md">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>无损本地</span>
-                  </div>
-                )}
+
+                {/* 标题 */}
+                <h3 className="text-xl font-bold text-[#F8FAFC] mb-2 group-hover:text-[#22C55E] transition-colors">
+                  {tool.name}
+                </h3>
+
+                {/* 描述 */}
+                <p className="text-[#94A3B8] text-sm leading-relaxed mb-4">
+                  {tool.description}
+                </p>
+
+                {/* 底部箭头 */}
+                <div className="mt-auto pt-4 flex items-center text-[#22C55E] group-hover:text-[#10B981]">
+                  <span>开始使用</span>
+                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
               </div>
-
-              {/* 标题 */}
-              <h3 className="text-xl font-bold text-[#F8FAFC] mb-2 group-hover:text-[#22C55E] transition-colors">
-                {tool.name}
-              </h3>
-
-              {/* 描述 */}
-              <p className="text-[#94A3B8] text-sm leading-relaxed mb-4">
-                {tool.description}
-              </p>
-
-              {/* 底部箭头 */}
-              <div className="mt-auto pt-4 flex items-center text-[#22C55E] group-hover:text-[#10B981]">
-                <span>开始使用</span>
-                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </div>
-            </div>
-          </Link>
-        ))}
+            </Link>
+          ))}
+        </div>
       </div>
-
-
     </div>
   )
 }
