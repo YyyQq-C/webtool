@@ -13,18 +13,34 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] flex flex-col relative">
-        {/* 右上角 Gitee 链接 */}
-        <a 
-          href="https://gitee.com/YongQianc/webtool" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="fixed top-6 right-6 z-50 group"
-          title="Fork me on Gitee"
-        >
-          <div className="bg-[#1E293B]/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10 hover:border-red-500/50 transition-all duration-300 shadow-2xl hover:shadow-red-500/20 group-hover:scale-110 active:scale-95">
-            <img src="/gitee.png" alt="Gitee" className="w-6 h-6 opacity-70 group-hover:opacity-100 transition-opacity" />
-          </div>
-        </a>
+        {/* 右上角 社交/仓库 链接 */}
+        <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
+          {/* Gitee */}
+          <a 
+            href="https://gitee.com/YongQianc/webtool" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group"
+            title="Gitee 仓库"
+          >
+            <div className="bg-[#1E293B]/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10 hover:border-red-500/50 transition-all duration-300 shadow-2xl hover:shadow-red-500/20 group-hover:scale-110 active:scale-95">
+              <img src="/gitee.png" alt="Gitee" className="w-6 h-6 opacity-70 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </a>
+
+          {/* GitHub */}
+          <a 
+            href="https://github.com/YyyQq-C/webtool" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="group"
+            title="GitHub 仓库"
+          >
+            <div className="bg-[#1E293B]/60 backdrop-blur-xl p-3 rounded-2xl border border-white/10 hover:border-emerald-500/50 transition-all duration-300 shadow-2xl hover:shadow-emerald-500/20 group-hover:scale-110 active:scale-95">
+              <img src="/github.png" alt="GitHub" className="w-6 h-6 opacity-70 group-hover:opacity-100 transition-opacity" />
+            </div>
+          </a>
+        </div>
 
         <main className="flex-grow">
           <Routes>
