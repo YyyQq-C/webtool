@@ -10,9 +10,26 @@ PORT=8000
 
 echo "🚀 启动去背景后端服务 (Python 3 + Playwright)..."
 
-# 检查 Python 3
-if ! command -v python3 &>/dev/null; then
-    echo "❌ Python 3 未安装"
+# 检查 Python
+if command -v python3 &>/dev/null; then
+    PYTHON_CMD="python3"
+elif command -v python &>/dev/null; then
+    PYTHON_CMD="python"
+    # 检查是否是 Python 3
+    if ! $PYTHON_CMD --version 2>&1 | grep -q "Python 3"; then
+        echo "❌ 未找到 Python 3 (当前 python 命令为 $($PYTHON_CMD --version))"
+        exit 1
+    fi
+else
+    echo "❌ 未找到 python3 或 python 命令"
+    exit 1
+fi
+
+# 检查 Pip
+if $PYTHON_CMD -m pip --version &>/dev/null; then
+    PIP_CMD="$PYTHON_CMD -m pip"
+else
+    echo "❌ 未找到 pip 模块"
     exit 1
 fi
 
@@ -27,24 +44,24 @@ cd "$SERVER_DIR"
 # 安装依赖
 echo "📦 安装依赖..."
 if [ -f "requirements.txt" ]; then
-    pip3 install -r requirements.txt
+    $PIP_CMD install -r requirements.txt
 fi
 
 # 安装 Playwright 浏览器
 echo "🌍 安装 Playwright 浏览器依赖..."
-playwright install chromium
+$PYTHON_CMD -m playwright install chromium
 
 # 检查端口占用
 if lsof -i:$PORT > /dev/null 2>&1; then
     echo "⚠️  端口 $PORT 已被占用，正在停止旧服务..."
-    pkill -f "python3 server.py" 2>/dev/null || true
+    pkill -f "$PYTHON_CMD server.py" 2>/dev/null || true
     sleep 2
 fi
 
 # 启动服务
 echo "📡 启动服务 (端口: $PORT)..."
 export PORT=$PORT
-nohup python3 server.py > "$LOG_FILE" 2>&1 &
+nohup $PYTHON_CMD server.py > "$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 
 # 等待启动

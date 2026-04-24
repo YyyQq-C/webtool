@@ -22,14 +22,6 @@ from pydantic import BaseModel
 import uvicorn
 from playwright.async_api import async_playwright
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 pwd = Path(__file__).parent.absolute()
 TEMP_DIR = pwd / "temp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,10 +60,6 @@ async def cleanup_task():
         for u in expired_urls:
             del url_cache[u]
 
-@app.on_event("startup")
-async def startup_event():
-    asyncio.create_task(cleanup_task())
-
 browser_instance = None
 playwright_instance = None
 
@@ -91,13 +79,27 @@ async def get_browser():
         )
     return browser_instance
 
-@app.on_event("shutdown")
-async def shutdown_event():
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    asyncio.create_task(cleanup_task())
+    yield
+    # Shutdown
     global browser_instance, playwright_instance
     if browser_instance:
          await browser_instance.close()
     if playwright_instance:
          await playwright_instance.stop()
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 def health():
