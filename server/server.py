@@ -30,6 +30,7 @@ from services.downloader import DownloadImagesReq, get_url_hash, process_image_d
 from services.scraper import fetch_page_data
 from services.pdf_maker import create_images_pdf, create_webpage_pdf, GenerateImagesPdfReq
 from script.inpaint import detect_watermark as inpaint_detect, remove_watermark as inpaint_remove
+from script.compare import compare_images
 
 pwd = Path(__file__).parent.absolute()
 TEMP_DIR = pwd / "temp"

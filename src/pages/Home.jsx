@@ -90,6 +90,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'image-compare',
+    name: '图片相似度',
+    description: '对比两张图片相似程度，返回评分',
+    icon: null,
+    emoji: '🔍',
+    path: '/image-compare',
+    color: 'from-sky-500 to-blue-600',
+    localOnly: false,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
