@@ -154,7 +154,7 @@ function Home() {
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
                     {tool.icon ? (
                       // brightness-0 invert
-                      <img src={tool.icon} alt="" className="w-8 h-8 object-contain " />
+                      <img src={tool.icon} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
                     ) : (
                       <span>{tool.emoji}</span>
                     )}
