@@ -22,7 +22,6 @@ from services.downloader import DownloadImagesReq, get_url_hash, process_image_d
 from services.scraper import fetch_page_data
 from services.pdf_maker import create_images_pdf, create_webpage_pdf, GenerateImagesPdfReq
 from script.inpaint import detect_watermark as inpaint_detect, remove_watermark as inpaint_remove
-from script.remove_bg import remove_background as rembg_process
 
 pwd = Path(__file__).parent.absolute()
 TEMP_DIR = pwd / "temp"
@@ -64,21 +63,24 @@ async def cleanup_task():
 
 browser_instance = None
 playwright_instance = None
+browser_lock = asyncio.Lock()
 
 async def get_browser():
     global browser_instance, playwright_instance
-    if browser_instance is None:
-        playwright_instance = await async_playwright().start()
-        browser_instance = await playwright_instance.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--single-process',
-            ]
-        )
+    async with browser_lock:
+        if browser_instance is None or not browser_instance.is_connected():
+            if playwright_instance is None:
+                playwright_instance = await async_playwright().start()
+            browser_instance = await playwright_instance.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--single-process',
+                ]
+            )
     return browser_instance
 
 @asynccontextmanager
@@ -294,6 +296,7 @@ async def api_remove_background(file: UploadFile = File(...)):
     print(f"[BG] 开始去背景处理: {file.filename}")
     
     try:
+        from script.remove_bg import remove_background as rembg_process
         await asyncio.to_thread(rembg_process, str(img_path), str(out_file))
         
         asyncio.get_event_loop().run_in_executor(None, lambda: img_path.unlink(missing_ok=True))
