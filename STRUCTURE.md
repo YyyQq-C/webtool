@@ -13,7 +13,13 @@
 │   │   ├── Home.jsx              # 工具列表首页
 │   │   ├── ImageConverter.jsx    # 图片格式转换
 │   │   ├── ImageToPdf.jsx        # 图片转PDF
-│   │   └── ImageBgRemover.jsx    # 图片去背景
+│   │   ├── ImageBgRemover.jsx    # 图片去背景
+│   │   ├── WebToPdf.jsx          # 网页转PDF
+│   │   ├── ImageWatermarkRemover.jsx # 图片去水印
+│   │   ├── ImageCropper.jsx      # 图片裁剪 (react-image-crop)
+│   │   └── ImageResizer.jsx      # 分辨率调整 (Batch Resize)
+│   ├── utils/                    # 通用工具
+│   │   └── cropImage.js          # 裁剪逻辑辅助
 │   ├── App.jsx                   # 主应用
 │   ├── main.jsx                  # 入口文件
 │   └── index.css                 # 全局样式
