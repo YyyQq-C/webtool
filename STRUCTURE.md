@@ -18,7 +18,14 @@
 │   ├── main.jsx                  # 入口文件
 │   └── index.css                 # 全局样式
 ├── server/                       # 后端服务
-│   ├── main.py                   # FastAPI 应用
+│   ├── server.py                 # FastAPI 入口路由
+│   ├── services/                 # 业务逻辑独立模块
+│   │   ├── downloader.py         # 图片下载与处理
+│   │   ├── scraper.py            # Playwright网页抓取
+│   │   └── pdf_maker.py          # PDF生成引擎
+│   ├── script/                   # 独立工具脚本
+│   │   ├── inpaint.py            # OpenCV 去水印模块
+│   │   └── remove_bg.py          # rembg 去背景模块
 │   ├── requirements.txt          # Python 依赖
 │   ├── start.sh                  # 启动脚本
 │   └── stop.sh                   # 停止脚本

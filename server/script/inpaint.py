@@ -50,8 +50,7 @@ def detect_watermark(image_path, output_mask_path):
     try:
         img = load_image(image_path)
         if img is None:
-            print("Failed to read image", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("Failed to read image")
 
         # 如果是 RGBA，转灰度时只用 RGB 通道
         if len(img.shape) == 3 and img.shape[2] == 4:
@@ -108,12 +107,11 @@ def detect_watermark(image_path, output_mask_path):
         _, buffer = cv2.imencode('.png', combined_mask)
         mask_base64 = base64.b64encode(buffer).decode('utf-8')
 
-        print(f"Detected {cv2.countNonZero(combined_mask)} watermark pixels")
         print(f"MASK_BASE64:{mask_base64}")
+        return mask_base64
 
     except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(str(e))
 
 def remove_watermark(image_path, mask_path, output_path):
     """
@@ -123,13 +121,11 @@ def remove_watermark(image_path, mask_path, output_path):
     try:
         img = load_image(image_path)
         if img is None:
-            print("Failed to read image", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("Failed to read image")
 
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
-            print("Failed to read mask", file=sys.stderr)
-            sys.exit(1)
+            raise RuntimeError("Failed to read mask")
 
         _, mask = cv2.threshold(mask, 10, 255, cv2.THRESH_BINARY)
 
@@ -170,10 +166,10 @@ def remove_watermark(image_path, mask_path, output_path):
 
         cv2.imwrite(output_path, final)
         print("Success")
+        return True
 
     except Exception as e:
-        print(f"Error: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+        raise RuntimeError(str(e))
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
@@ -184,16 +180,20 @@ if __name__ == "__main__":
 
     action = sys.argv[1]
 
-    if action == "detect":
-        if len(sys.argv) != 4:
-            print("Usage: python3 inpaint.py detect <image_path> <output_mask_path>", file=sys.stderr)
+    try:
+        if action == "detect":
+            if len(sys.argv) != 4:
+                print("Usage: python3 inpaint.py detect <image_path> <output_mask_path>", file=sys.stderr)
+                sys.exit(1)
+            detect_watermark(sys.argv[2], sys.argv[3])
+        elif action == "remove":
+            if len(sys.argv) != 5:
+                print("Usage: python3 inpaint.py remove <image_path> <mask_path> <output_path>", file=sys.stderr)
+                sys.exit(1)
+            remove_watermark(sys.argv[2], sys.argv[3], sys.argv[4])
+        else:
+            print(f"Unknown action: {action}", file=sys.stderr)
             sys.exit(1)
-        detect_watermark(sys.argv[2], sys.argv[3])
-    elif action == "remove":
-        if len(sys.argv) != 5:
-            print("Usage: python3 inpaint.py remove <image_path> <mask_path> <output_path>", file=sys.stderr)
-            sys.exit(1)
-        remove_watermark(sys.argv[2], sys.argv[3], sys.argv[4])
-    else:
-        print(f"Unknown action: {action}", file=sys.stderr)
+    except Exception as err:
+        print(f"Error: {str(err)}", file=sys.stderr)
         sys.exit(1)
