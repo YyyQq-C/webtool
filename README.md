@@ -1,73 +1,163 @@
-# 工具箱 - 图片格式转换工具
+# 蓝胖子的口袋 - 图片工具箱
 
-一个现代化的前端工具集合，基于 React + Vite + Tailwind CSS 构建。
+一个现代化的在线图片工具集合，基于 React + Vite + Tailwind CSS 构建，Node.js + Puppeteer 后端服务。
 
-## 功能特性
+## 🎯 功能特性
 
-### 图片格式转换工具
-- ✅ 拖拽上传图片
-- ✅ 批量转换图片格式
-- ✅ 支持格式：JPEG, PNG, WebP, BMP, GIF
-- ✅ 全局格式设置或单独指定每张图片格式
-- ✅ 打包下载所有转换后的图片（ZIP格式）
-- ✅ 自动清理：下载完成10分钟后自动删除资源
-- ✅ 本地处理，无需上传到服务器，保护隐私
+### 图片格式转换
+- ✅ 拖拽上传、批量转换
+- ✅ 支持格式：JPG, JPEG, PNG, WebP, BMP, GIF, ICO, AVIF, TIFF, PDF
+- ✅ 压缩率调节、PNG→JPG 白底填充
+- ✅ 打包 ZIP 下载
+- 🔒 **浏览器本地处理，保护隐私**
 
-## 技术栈
+### 图片转 PDF
+- ✅ 多张图片合并 PDF
+- ✅ 拖拽排序
+- ✅ 横版图片自动旋转
+- 🔒 **浏览器本地处理，保护隐私**
 
-- **框架**: React 19
-- **构建工具**: Vite 8
-- **样式**: Tailwind CSS 4
-- **路由**: React Router DOM
-- **打包**: JSZip
-- **文件保存**: FileSaver.js
+### 图片去背景
+- ✅ 双模式：浏览器端 + 服务器端
+- ✅ 浏览器端：@imgly/background-removal，本地处理
+- ✅ 服务器端：rembg (u2net 模型)，效果更好
+- ✅ 支持 ICO、WebP 等多种格式
 
-## 开发
+### 网页转 PDF
+- ✅ Puppeteer 完整 JS 渲染
+- ✅ 两种模式：完整页面 / 仅提取图片
+- ✅ 图片筛选、排序、PDF 导出
+- ✅ URL 缓存机制（10分钟）
+- ✅ 横版图片自动旋转
 
-```bash
-# 安装依赖
-npm install
+### 图片去水印
+- ✅ 画笔标记 + 智能检测
+- ✅ OpenCV TELEA/NS 算法融合
+- ✅ 支持 ICO、WebP、GIF、TIFF 等多种格式
+- ✅ 边界平滑处理
 
-# 启动开发服务器
-npm run dev
+## 🛠️ 技术栈
 
-# 构建生产版本
-npm run build
+| 类别 | 技术 |
+|------|------|
+| 前端框架 | React 19 + Vite 8 |
+| 样式 | Tailwind CSS 4 |
+| 路由 | React Router DOM |
+| 打包 | JSZip + FileSaver.js |
+| 去背景(浏览器) | @imgly/background-removal |
+| 后端服务 | Node.js + Express + Puppeteer |
+| 去背景(服务器) | Python + rembg (u2net) |
+| 去水印 | Python + OpenCV |
+| 反向代理 | Nginx |
 
-# 预览生产版本
-npm run preview
-```
-
-## 项目结构
+## 📁 项目结构
 
 ```
 /data/tool/
-├── src/
-│   ├── components/
-│   │   ├── ImageDropzone.jsx    # 图片拖拽上传组件
-│   │   └── ImagePreview.jsx     # 图片预览组件
-│   ├── pages/
-│   │   ├── Home.jsx             # 工具列表首页
-│   │   └── ImageConverter.jsx   # 图片格式转换页面
-│   ├── App.jsx                  # 主应用组件
-│   ├── main.jsx                 # 入口文件
-│   └── index.css                # Tailwind CSS 入口
-├── index.html
-├── package.json
-├── postcss.config.js
-├── tailwind.config.js
-└── vite.config.js
+├── script/                    # 前端脚本
+│   ├── build.sh              # 快速构建
+│   ├── deploy.sh             # 一键部署
+│   └── setup-nginx.sh        # Nginx 配置
+├── server/                    # 后端服务
+│   ├── script/               # Python 脚本
+│   │   ├── inpaint.py        # 去水印
+│   │   └── remove-bg.py      # 去背景
+│   ├── node-server.js        # Node.js 主服务
+│   ├── package.json
+│   └── start.sh / stop.sh    # 服务管理
+├── src/                       # 前端源码
+│   ├── components/           # 组件
+│   ├── pages/                # 页面
+│   └── App.jsx / main.jsx
+├── public/                    # 静态资源
+├── dist/                      # 构建输出
+└── index.html
 ```
 
-## 使用说明
+## 🚀 快速开始
 
-1. 访问首页，点击"图片格式转换"工具
-2. 拖拽或点击上传区域选择图片文件
-3. 使用全局格式下拉框批量设置所有图片格式，或单独设置每张图片的格式
-4. 点击"开始转换"按钮进行格式转换
-5. 转换完成后，点击"打包下载"下载所有转换后的图片
-6. 下载完成10分钟后，本次所有资源将自动清理
+### 前端
 
-## 隐私保护
+```bash
+cd /data/tool
 
-所有图片处理均在浏览器本地完成，不会上传到任何服务器，保护您的隐私安全。
+# 安装依赖
+npm install
+
+# 开发模式
+npm run dev
+
+# 构建
+./script/build.sh
+
+# 一键部署（构建 + Nginx 重载）
+./script/deploy.sh
+```
+
+### 后端服务
+
+```bash
+cd /data/tool/server
+
+# 安装依赖
+npm install
+
+# 启动服务
+./start.sh
+
+# 停止服务
+./stop.sh
+
+# 健康检查
+curl http://localhost:8000/health
+```
+
+### Nginx 配置
+
+```bash
+# 安装 Nginx 配置
+./script/setup-nginx.sh
+
+# 手动重载
+sudo nginx -s reload
+```
+
+## 🔒 隐私保护
+
+| 工具 | 处理方式 |
+|------|----------|
+| 图片格式转换 | 浏览器本地 ✅ |
+| 图片转 PDF | 浏览器本地 ✅ |
+| 图片去背景(浏览器端) | 浏览器本地 ✅ |
+| 图片去背景(服务器端) | 服务器处理，10分钟自动清理 |
+| 网页转 PDF | 服务器处理，10分钟自动清理 |
+| 图片去水印 | 服务器处理，1分钟自动清理 |
+
+## 📍 访问地址
+
+- 前端：http://localhost:10010
+- 后端 API：http://localhost:8000
+- Nginx 代理：`/bg-api/` → `http://127.0.0.1:8000/`
+
+## 📋 API 接口
+
+| 接口 | 功能 |
+|------|------|
+| `/health` | 健康检查 |
+| `/api/fetch-page` | 解析网页内容 |
+| `/api/download-images` | 下载图片到服务器 |
+| `/api/generate-images-pdf` | 生成图片 PDF |
+| `/api/generate-pdf` | 生成完整网页 PDF |
+| `/api/remove-background` | 去背景 |
+| `/api/detect-watermark` | 智能检测水印 |
+| `/api/remove-watermark` | 去除水印 |
+
+## 📝 版本信息
+
+- Node.js: v24.14.0
+- Puppeteer Chrome: 127.0.6533.88
+- rembg 模型: u2net (~167MB)
+
+## 📄 License
+
+MIT License
