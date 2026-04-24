@@ -50,6 +50,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'image-shape',
+    name: '形状裁切',
+    description: '圆形、圆角矩形、爱心、星形裁切',
+    icon: null,
+    emoji: '✨',
+    path: '/image-shape',
+    color: 'from-fuchsia-500 to-pink-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
