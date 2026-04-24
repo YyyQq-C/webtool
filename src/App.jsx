@@ -25,7 +25,7 @@ function App() {
             <Route path="/image-resizer" element={<ImageResizer />} />
           </Routes>
         </main>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     </Router>
   )
