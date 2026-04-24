@@ -80,6 +80,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'image-compress',
+    name: '图片压缩',
+    description: '实时预览压缩效果，调整质量下载',
+    icon: null,
+    emoji: '📦',
+    path: '/image-compress',
+    color: 'from-lime-500 to-green-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
