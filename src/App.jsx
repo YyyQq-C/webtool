@@ -13,8 +13,8 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] flex flex-col relative">
-        {/* 右上角 社交/仓库 链接 */}
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3">
+        {/* 右上角 社交/仓库 链接 - 窄屏幕隐藏 */}
+        <div className="hidden md:flex fixed top-6 right-6 z-50 items-center gap-3">
           {/* Gitee */}
           <a 
             href="https://gitee.com/YongQianc/webtool" 
