@@ -16,8 +16,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/image-converter" element={<ImageConverter />} />
             <Route path="/image-to-pdf" element={<ImageToPdf />} />
-            <Route path="/image-bg-remover" element={<ImageBgRemover />} />
             <Route path="/web-to-pdf" element={<WebToPdf />} />
+            <Route path="/image-bg-remover" element={<ImageBgRemover />} />
             <Route path="/image-watermark-remover" element={<ImageWatermarkRemover />} />
           </Routes>
         </main>

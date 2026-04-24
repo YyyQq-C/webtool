@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 
-function ImageEditor({ originalImage, resultImage, onSave }) {
-  const [isEditing, setIsEditing] = useState(false)
+function ImageEditor({ originalImage, resultImage, onSave, onCancel }) {
   const [brushMode, setBrushMode] = useState('remove') // 'remove' | 'restore'
   const [brushSize, setBrushSize] = useState(20)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -14,7 +13,7 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
 
   // 初始化编辑器
   useEffect(() => {
-    if (!isEditing || !resultImage || !originalImage) return
+    if (!resultImage || !originalImage) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -28,7 +27,7 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
       saveToHistory()
     }
     img.src = resultImage
-  }, [isEditing, resultImage, originalImage])
+  }, [resultImage, originalImage, saveToHistory])
 
   // 保存到历史记录
   const saveToHistory = useCallback(() => {
@@ -141,26 +140,21 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
     canvas.toBlob((blob) => {
       const url = URL.createObjectURL(blob)
       onSave(url)
-      setIsEditing(false)
     }, 'image/png')
   }, [onSave])
 
-  if (!isEditing) {
-    return (
-      <button
-        onClick={() => setIsEditing(true)}
-        disabled={!resultImage}
-        className="px-4 py-2 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-        </svg>
-        编辑结果
-      </button>
-    )
-  }
+  // 动态画笔样式
+  const cursorStyle = useMemo(() => {
+    const size = brushSize;
+    const center = size / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${center}" cy="${center}" r="${center > 1 ? center - 1 : center}" fill="none" stroke="white" stroke-width="2"/>
+      <circle cx="${center}" cy="${center}" r="${center > 1 ? center - 1 : center}" fill="none" stroke="black" stroke-width="1"/>
+    </svg>`;
+    return `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}') ${center} ${center}, crosshair`;
+  }, [brushSize])
 
-  return (
+
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
       {/* 顶部工具栏 */}
       <div className="bg-[#1E293B] border-b border-[#475569] p-4">
@@ -231,7 +225,7 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
             {/* 保存/取消 */}
             <div className="flex gap-2">
               <button
-                onClick={() => setIsEditing(false)}
+                onClick={onCancel}
                 className="px-4 py-2 bg-[#475569] hover:bg-[#64748B] text-white rounded-lg transition-colors"
               >
                 取消
@@ -266,7 +260,7 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
           >
             <canvas
               ref={canvasRef}
-              className="max-w-full max-h-[calc(100vh-200px)] object-contain cursor-crosshair"
+              className="max-w-full max-h-[calc(100vh-200px)] object-contain"
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
@@ -274,7 +268,7 @@ function ImageEditor({ originalImage, resultImage, onSave }) {
               onTouchStart={startDrawing}
               onTouchMove={draw}
               onTouchEnd={stopDrawing}
-              style={{ touchAction: 'none' }}
+              style={{ touchAction: 'none', cursor: cursorStyle }}
             />
           </div>
         </div>

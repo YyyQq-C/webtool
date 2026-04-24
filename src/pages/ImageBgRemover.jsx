@@ -331,7 +331,6 @@ function ImageBgRemover() {
         </div>
       </div>
 
-      {/* 图片编辑器 */}
       {isEditing && (
         <ImageEditor
           originalImage={image?.preview}
@@ -341,6 +340,7 @@ function ImageBgRemover() {
             setResult(editedUrl)
             setIsEditing(false)
           }}
+          onCancel={() => setIsEditing(false)}
         />
       )}
     </div>

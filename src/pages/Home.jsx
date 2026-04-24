@@ -21,16 +21,6 @@ const tools = [
     localOnly: true, // 浏览器本地处理
   },
   {
-    id: 'image-bg-remover',
-    name: '图片去背景',
-    description: 'AI智能去除图片背景，支持预览和下载PNG',
-    icon: null,
-    emoji: '✂️',
-    path: '/image-bg-remover',
-    color: 'from-green-500 to-teal-600',
-    localOnly: false, // 需要服务器处理
-  },
-  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
@@ -38,6 +28,16 @@ const tools = [
     emoji: '🌐',
     path: '/web-to-pdf',
     color: 'from-purple-500 to-blue-600',
+    localOnly: false, // 需要服务器处理
+  },
+  {
+    id: 'image-bg-remover',
+    name: '图片去背景',
+    description: 'AI智能去除图片背景，支持预览和下载PNG',
+    icon: null,
+    emoji: '✂️',
+    path: '/image-bg-remover',
+    color: 'from-green-500 to-teal-600',
     localOnly: false, // 需要服务器处理
   },
   {
@@ -55,10 +55,10 @@ const tools = [
 function Home() {
   return (
     <div className="container mx-auto px-4 py-12">
-      {/* 左上角图标 */}
-      <div className="fixed top-4 left-4 z-50">
+      {/* 顶部图标 */}
+      <div className="flex justify-center md:justify-start mb-8 md:mb-12">
         <Link to="/" className="hover:opacity-80 transition-opacity">
-          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-64 h-64 object-contain" />
+          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-40 md:w-56 h-auto object-contain" />
         </Link>
       </div>
 
