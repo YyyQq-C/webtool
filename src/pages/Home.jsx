@@ -40,6 +40,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'image-watermark',
+    name: '图片加水印',
+    description: '添加文字或图片水印，位置透明度可调',
+    icon: null,
+    emoji: '🏷️',
+    path: '/image-watermark',
+    color: 'from-amber-500 to-orange-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
