@@ -2,6 +2,8 @@
 
 一个现代化的在线图片工具集合，基于 React + Vite + Tailwind CSS 构建，纯 Python (FastAPI + Playwright) 后端服务。
 
+**🚀 在线演示地址: [http://tool.woyoai.com/](http://tool.woyoai.com/)**
+
 ## 🎯 功能特性
 
 ### 图片格式转换
@@ -177,6 +179,7 @@ sudo nginx -s reload
 
 ## 📍 访问地址
 
+- **在线演示地址**: [http://tool.woyoai.com/](http://tool.woyoai.com/)
 - **默认前端绑定端口**：`http://localhost:10010`
 - **默认后端内部 API**：`http://localhost:8000`
 - **线上发布 Nginx 代理规则约定**：前端请求路径中 `/bg-api/` 项将自动反代至上方的 `http://127.0.0.1:8000/`
@@ -204,3 +207,11 @@ sudo nginx -s reload
 ## 📄 License
 
 MIT License
+
+---
+
+## ☕ 赞赏支持
+
+如果您觉得这个工具有所帮助，欢迎请作者喝杯咖啡 ~
+
+![微信赞赏码](doc/wechat.jpg)
