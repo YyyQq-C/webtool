@@ -30,6 +30,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'image-splice',
+    name: '图片拼接',
+    description: '多张图片横向、纵向、网格拼接成一张',
+    icon: null,
+    emoji: '🧩',
+    path: '/image-splice',
+    color: 'from-indigo-500 to-purple-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',

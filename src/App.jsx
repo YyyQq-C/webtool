@@ -7,6 +7,7 @@ import WebToPdf from './pages/WebToPdf'
 import ImageWatermarkRemover from './pages/ImageWatermarkRemover'
 import ImageCropper from './pages/ImageCropper'
 import ImageResizer from './pages/ImageResizer'
+import ImageSplice from './pages/ImageSplice'
 import Footer from './components/Footer'
 
 function App() {
@@ -54,6 +55,7 @@ function App() {
             <Route path="/image-watermark-remover" element={<ImageWatermarkRemover />} />
             <Route path="/image-cropper" element={<ImageCropper />} />
             <Route path="/image-resizer" element={<ImageResizer />} />
+            <Route path="/image-splice" element={<ImageSplice />} />
           </Routes>
         </main>
         {/* <Footer /> */}
