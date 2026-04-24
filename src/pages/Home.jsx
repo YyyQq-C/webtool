@@ -60,6 +60,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'gif-extractor',
+    name: 'GIF 分帧提取',
+    description: '将 GIF 动图拆分为单帧图片下载',
+    icon: null,
+    emoji: '🎬',
+    path: '/gif-extractor',
+    color: 'from-violet-500 to-purple-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',

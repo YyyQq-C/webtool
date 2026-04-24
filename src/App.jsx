@@ -10,6 +10,7 @@ import ImageResizer from './pages/ImageResizer'
 import ImageSplice from './pages/ImageSplice'
 import ImageWatermark from './pages/ImageWatermark'
 import ImageShape from './pages/ImageShape'
+import GifExtractor from './pages/GifExtractor'
 import Footer from './components/Footer'
 
 function App() {
@@ -60,6 +61,7 @@ function App() {
             <Route path="/image-splice" element={<ImageSplice />} />
             <Route path="/image-watermark" element={<ImageWatermark />} />
             <Route path="/image-shape" element={<ImageShape />}  />
+            <Route path="/gif-extractor" element={<GifExtractor />} />
           </Routes>
         </main>
         {/* <Footer /> */}
