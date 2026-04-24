@@ -11,7 +11,8 @@ function WebToPdf() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [error, setError] = useState('')
   const [warning, setWarning] = useState('')
-  const [mode, setMode] = useState('full') // 'full' | 'images'
+  const [mode, setMode] = useState('images') // 'full' | 'images' - 默认仅提取图片
+  const [skipCache, setSkipCache] = useState(false) // 是否跳过缓存
   const [fetchedHtml, setFetchedHtml] = useState('')
   const [pageTitle, setPageTitle] = useState('')
   const [pageImages, setPageImages] = useState([])
@@ -106,6 +107,7 @@ function WebToPdf() {
     setExpiresAt(null)
 
     try {
+      // 1. 获取网页内容
       const res = await fetch(`${SERVER_URL}/bg-api/api/fetch-page?url=${encodeURIComponent(targetUrl)}&mode=${mode}`)
 
       if (!res.ok) {
@@ -119,7 +121,44 @@ function WebToPdf() {
       if (data.warning) {
         setWarning(data.warning)
       }
-      if (data.images && data.images.length > 0) {
+      
+      // 2. 如果是图片模式，自动下载图片到服务器
+      if (mode === 'images' && data.images && data.images.length > 0) {
+        setPageImages(data.images)
+        
+        // 自动下载图片到服务器
+        setIsDownloading(true)
+        try {
+          const downloadRes = await fetch(`${SERVER_URL}/bg-api/api/download-images`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: targetUrl, images: data.images, skipCache }),
+          })
+
+          if (!downloadRes.ok) {
+            const errData = await downloadRes.json().catch(() => ({}))
+            throw new Error(errData.error || `下载失败 (${downloadRes.status})`)
+          }
+
+          const downloadData = await downloadRes.json()
+          setSessionId(downloadData.sessionId)
+          // 初始化 selected 状态，并修复图片路径（添加 /bg-api 前缀）
+          const imagesWithStatus = downloadData.images
+            .filter(img => !img.error)
+            .map(img => ({
+              ...img,
+              selected: true,
+              path: `/bg-api${img.path}`  // 修复路径，添加 nginx 代理前缀
+            }))
+          setDownloadedImages(imagesWithStatus)
+          setExpiresAt(downloadData.expiresAt)
+        } catch (downloadErr) {
+          console.error('自动下载图片失败:', downloadErr)
+          setError(downloadErr.message || '图片下载失败')
+        } finally {
+          setIsDownloading(false)
+        }
+      } else if (data.images && data.images.length > 0) {
         setPageImages(data.images)
       }
     } catch (err) {
@@ -127,7 +166,7 @@ function WebToPdf() {
     } finally {
       setIsLoading(false)
     }
-  }, [url, mode])
+  }, [url, mode, skipCache])
 
   // 下载图片到服务器
   const downloadImages = useCallback(async () => {
@@ -140,7 +179,7 @@ function WebToPdf() {
       const res = await fetch(`${SERVER_URL}/bg-api/api/download-images`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, images: pageImages }),
+        body: JSON.stringify({ url, images: pageImages, skipCache }),
       })
 
       if (!res.ok) {
@@ -157,11 +196,11 @@ function WebToPdf() {
     } finally {
       setIsDownloading(false)
     }
-  }, [url, pageImages])
+  }, [url, pageImages, skipCache])
 
   // 生成图片 PDF
   const generateImagesPdf = useCallback(async () => {
-    const selectedImages = downloadedImages.filter(img => img.selected !== false)
+    const selectedImages = downloadedImages.filter(img => img.selected === true)
     if (selectedImages.length === 0) {
       setError('请至少选择一张图片')
       return
@@ -241,7 +280,7 @@ function WebToPdf() {
 
   // 全选/取消全选
   const toggleSelectAll = useCallback(() => {
-    const allSelected = downloadedImages.every(img => img.selected !== false)
+    const allSelected = downloadedImages.every(img => img.selected === true)
     setDownloadedImages(prev =>
       prev.map(img => ({ ...img, selected: !allSelected }))
     )
@@ -312,7 +351,7 @@ function WebToPdf() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
-  const selectedCount = downloadedImages.filter(img => img.selected !== false).length
+  const selectedCount = downloadedImages.filter(img => img.selected === true).length
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -359,9 +398,21 @@ function WebToPdf() {
               onChange={(e) => setMode(e.target.value)}
               className="bg-[#334155] text-[#F8FAFC] px-4 py-3 rounded-lg border border-[#475569] focus:outline-none focus:ring-2 focus:ring-[#22C55E] flex-shrink-0"
             >
-              <option value="full">完整页面</option>
               <option value="images">仅提取图片</option>
+              <option value="full">完整页面</option>
             </select>
+            {/* 跳过缓存选项 */}
+            {mode === 'images' && (
+              <label className="flex items-center gap-2 text-[#94A3B8] cursor-pointer select-none px-3 py-2 rounded-lg bg-[#334155] border border-[#475569]">
+                <input
+                  type="checkbox"
+                  checked={skipCache}
+                  onChange={(e) => setSkipCache(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#64748B] text-[#22C55E] focus:ring-[#22C55E] focus:ring-offset-0"
+                />
+                <span className="text-sm whitespace-nowrap">不读缓存</span>
+              </label>
+            )}
             <button
               onClick={loadPage}
               disabled={isLoading}
@@ -450,7 +501,7 @@ function WebToPdf() {
                   className="text-sm text-[#94A3B8] hover:text-[#F8FAFC] transition-colors"
                   type="button"
                 >
-                  {downloadedImages.every(img => img.selected !== false) ? '取消全选' : '全选'}
+                  {downloadedImages.every(img => img.selected === true) ? '取消全选' : '全选'}
                 </button>
               </div>
               <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto">
@@ -462,22 +513,22 @@ function WebToPdf() {
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDrop={() => handleDrop(idx)}
                     onDragEnd={handleDragEnd}
-                    className={`relative bg-[#334155] rounded-lg overflow-hidden transition-all ${
+                    className={`relative bg-[#334155] rounded-lg overflow-hidden transition-all cursor-pointer ${
                       img.selected === false ? 'opacity-50' : ''
                     } ${dragOverIndex === idx ? 'ring-2 ring-[#22C55E]' : ''}`}
                   >
                     {/* 选择框 */}
                     <div className="absolute top-2 left-2 z-10">
                       <button
-                        onClick={() => toggleImageSelection(img.id)}
+                        onClick={(e) => { e.stopPropagation(); toggleImageSelection(img.id) }}
                         className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${
-                          img.selected !== false
+                          img.selected === true
                             ? 'bg-[#22C55E] border-[#22C55E]'
                             : 'bg-transparent border-[#64748B]'
                         }`}
                         type="button"
                       >
-                        {img.selected !== false && (
+                        {img.selected === true && (
                           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
@@ -502,8 +553,9 @@ function WebToPdf() {
                     <img
                       src={img.path}
                       alt={img.alt}
-                      className="w-full h-40 object-cover"
+                      className="w-full h-40 object-cover cursor-pointer"
                       loading="lazy"
+                      onClick={() => toggleImageSelection(img.id)}
                     />
                     <div className="p-2">
                       <p className="text-[#94A3B8] text-xs truncate" title={img.alt}>{img.alt}</p>
@@ -539,21 +591,15 @@ function WebToPdf() {
             </div>
           )}
 
-          {/* 图片模式 - 显示提取的图片（未下载） */}
-          {mode === 'images' && !sessionId && pageImages.length > 0 && (
+          {/* 图片模式 - 显示下载中的状态 */}
+          {mode === 'images' && !sessionId && pageImages.length > 0 && isDownloading && (
             <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
               <div className="px-4 py-3 border-b border-[#475569]">
-                <h3 className="text-[#F8FAFC] font-semibold">提取的图片</h3>
+                <h3 className="text-[#F8FAFC] font-semibold">正在下载图片到服务器...</h3>
               </div>
-              <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto">
-                {pageImages.map((img, idx) => (
-                  <div key={idx} className="bg-[#334155] rounded-lg overflow-hidden">
-                    <img src={img.src} alt={img.alt} className="w-full h-32 object-cover" loading="lazy" />
-                    <div className="p-2">
-                      <p className="text-[#94A3B8] text-xs truncate" title={img.alt}>{img.alt}</p>
-                    </div>
-                  </div>
-                ))}
+              <div className="p-8 text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-[#22C55E] border-t-transparent mb-4"></div>
+                <p className="text-[#94A3B8]">正在下载 {pageImages.length} 张图片，请稍候...</p>
               </div>
             </div>
           )}

@@ -8,6 +8,8 @@ const https = require('https');
 const http = require('http');
 const multer = require('multer');
 const { spawn } = require('child_process');
+const sharp = require('sharp');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -19,13 +21,24 @@ if (!fs.existsSync(TEMP_DIR)) {
     fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
+// URL缓存映射：urlHash -> sessionId（仅图片模式）
+const urlCache = new Map();
+
 // 存储会话数据
 const sessions = new Map();
 
+// 生成 URL hash
+function getUrlHash(url) {
+    return crypto.createHash('md5').update(url).digest('hex');
+}
+
 // 清理过期文件（10分钟）
-const CLEANUP_INTERVAL = 10 * 60 * 1000; // 10分钟
+const CLEANUP_INTERVAL = 10 * 60 * 1000;
+
 setInterval(() => {
     const now = Date.now();
+    
+    // 清理过期会话
     for (const [sessionId, data] of sessions.entries()) {
         if (now - data.createdAt > CLEANUP_INTERVAL) {
             const sessionDir = path.join(TEMP_DIR, sessionId);
@@ -34,6 +47,14 @@ setInterval(() => {
             }
             sessions.delete(sessionId);
             console.log(`[CLEANUP] 清理过期会话: ${sessionId}`);
+        }
+    }
+    
+    // 清理过期URL缓存（跟随会话一起清理，10分钟）
+    for (const [urlHash, cacheData] of urlCache.entries()) {
+        if (now - cacheData.createdAt > CLEANUP_INTERVAL) {
+            urlCache.delete(urlHash);
+            console.log(`[CACHE] 清理过期URL缓存: ${urlHash}`);
         }
     }
 }, 60000);
@@ -57,23 +78,24 @@ async function getBrowser() {
     return browser;
 }
 
-async function downloadImage(url, filePath) {
+// 下载单张图片
+async function downloadImage(url, targetPath) {
     return new Promise((resolve, reject) => {
         const client = url.startsWith('https') ? https : http;
         client.get(url, (response) => {
             if (response.statusCode === 302 || response.statusCode === 301) {
-                downloadImage(response.headers.location, filePath).then(resolve).catch(reject);
+                downloadImage(response.headers.location, targetPath).then(resolve).catch(reject);
                 return;
             }
             if (response.statusCode !== 200) {
                 reject(new Error(`HTTP ${response.statusCode}`));
                 return;
             }
-            const writer = fs.createWriteStream(filePath);
+            const writer = fs.createWriteStream(targetPath);
             response.pipe(writer);
             writer.on('finish', () => {
-                const stats = fs.statSync(filePath);
-                resolve({ path: filePath, size: stats.size, url: url });
+                const stats = fs.statSync(targetPath);
+                resolve({ path: targetPath, size: stats.size, url: url });
             });
             writer.on('error', reject);
         }).on('error', reject);
@@ -108,13 +130,51 @@ app.get('/api/fetch-page', async (req, res) => {
 });
 
 app.post('/api/download-images', async (req, res) => {
-    const { url, images } = req.body;
+    const { url, images, skipCache } = req.body;
     if (!url || !images || !Array.isArray(images)) return res.status(400).json({ error: 'Missing url or images parameter' });
+    
     try {
+        // 检查 URL 缓存（除非用户要求跳过）
+        const urlHash = getUrlHash(url);
+        
+        if (!skipCache && urlCache.has(urlHash)) {
+            const cachedData = urlCache.get(urlHash);
+            const cachedSessionId = cachedData.sessionId;
+            const cachedSession = sessions.get(cachedSessionId);
+            
+            // 验证缓存会话是否有效
+            if (cachedSession && fs.existsSync(cachedSession.dir)) {
+                console.log(`[CACHE] 使用缓存会话: ${cachedSessionId} (URL: ${url.substring(0, 50)}...)`);
+                // 直接返回缓存会话的图片
+                res.json({
+                    sessionId: cachedSessionId,
+                    images: cachedSession.images,
+                    expiresAt: cachedSession.createdAt + CLEANUP_INTERVAL,
+                    cached: true
+                });
+                return;
+            } else {
+                // 缓存失效，清理
+                urlCache.delete(urlHash);
+                console.log(`[CACHE] 缓存会话失效，清理: ${cachedSessionId}`);
+            }
+        }
+        
+        // 跳过缓存或无缓存，创建新会话并下载图片
+        if (skipCache) {
+            console.log(`[CACHE] 跳过缓存，重新下载 (URL: ${url.substring(0, 50)}...)`);
+        }
+        
         const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const sessionDir = path.join(TEMP_DIR, sessionId);
         fs.mkdirSync(sessionDir, { recursive: true });
+        
         sessions.set(sessionId, { createdAt: Date.now(), url, dir: sessionDir, images: [] });
+        
+        // 记录 URL 缓存映射
+        urlCache.set(urlHash, { sessionId, createdAt: Date.now(), url });
+        console.log(`[CACHE] 新建会话: ${sessionId} (URL: ${url.substring(0, 50)}...)`);
+        
         const downloadedImages = [];
         for (let i = 0; i < images.length; i++) {
             const img = images[i];
@@ -130,7 +190,7 @@ app.post('/api/download-images', async (req, res) => {
             }
         }
         sessions.get(sessionId).images = downloadedImages;
-        res.json({ sessionId, images: downloadedImages, expiresAt: sessions.get(sessionId).createdAt + CLEANUP_INTERVAL });
+        res.json({ sessionId, images: downloadedImages, expiresAt: sessions.get(sessionId).createdAt + CLEANUP_INTERVAL, cached: false });
     } catch (error) {
         console.error('Download images error:', error);
         res.status(500).json({ error: `下载图片失败: ${error.message}` });
@@ -157,14 +217,40 @@ app.post('/api/generate-images-pdf', async (req, res) => {
     try {
         const browser = await getBrowser();
         const page = await browser.newPage();
-        let htmlContent = '<!DOCTYPE html><html><head><style>@page { size: A4; margin: 1cm; }body { margin: 0; padding: 0; background: white; }.img-page { width: 100%; min-height: 277mm; display: flex; align-items: center; justify-content: center; page-break-after: always; padding: 1cm; box-sizing: border-box; }.img-page:last-child { page-break-after: auto; }.img-page img { max-width: 100%; max-height: 277mm; object-fit: contain; }</style></head><body>';
+        
+        // 样式：横版图片使用横向页面，竖版图片使用纵向页面
+        let htmlContent = '<!DOCTYPE html><html><head><style>@page { margin: 0; }body { margin: 0; padding: 0; background: white; }.img-page { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; page-break-after: always; }.img-page:last-child { page-break-after: auto; }.img-page img { max-width: 100%; max-height: 100%; object-fit: contain; }</style></head><body>';
+        
         for (const img of selectedImages) {
             const imgPath = path.join(TEMP_DIR, sessionId, img.filename);
             if (fs.existsSync(imgPath)) {
-                const imgData = fs.readFileSync(imgPath).toString('base64');
-                const ext = path.extname(img.filename).toLowerCase();
-                const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-                htmlContent += `<div class="img-page"><img src="data:${mimeType};base64,${imgData}" alt="${img.alt || ''}" /></div>`;
+                try {
+                    // 读取图片并获取元数据
+                    const imageBuffer = fs.readFileSync(imgPath);
+                    const metadata = await sharp(imageBuffer).metadata();
+                    
+                    let processedBuffer = imageBuffer;
+                    let isLandscape = metadata.width > metadata.height;
+                    
+                    // 如果是横版图片，旋转90度变成竖版
+                    if (isLandscape) {
+                        processedBuffer = await sharp(imageBuffer)
+                            .rotate(90)  // 旋转90度
+                            .toBuffer();
+                    }
+                    
+                    const imgData = processedBuffer.toString('base64');
+                    const ext = path.extname(img.filename).toLowerCase();
+                    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                    htmlContent += `<div class="img-page"><img src="data:${mimeType};base64,${imgData}" alt="${img.alt || ''}" /></div>`;
+                } catch (imgError) {
+                    console.error(`处理图片失败: ${img.filename}`, imgError.message);
+                    // 如果处理失败，使用原始图片
+                    const imgData = fs.readFileSync(imgPath).toString('base64');
+                    const ext = path.extname(img.filename).toLowerCase();
+                    const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+                    htmlContent += `<div class="img-page"><img src="data:${mimeType};base64,${imgData}" alt="${img.alt || ''}" /></div>`;
+                }
             }
         }
         htmlContent += '</body></html>';
@@ -228,7 +314,7 @@ if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.post('/api/detect-watermark', upload.single('image'), (req, res) => {
     const imageFile = req.file;
     if (!imageFile) return res.status(400).json({ error: '缺少图片文件' });
-    const pythonScript = path.join(__dirname, 'inpaint.py');
+    const pythonScript = path.join(__dirname, 'script', 'inpaint.py');
     const maskFile = path.join(__dirname, 'uploads', `mask_${Date.now()}.png`);
     const pythonProcess = spawn('python3', [pythonScript, 'detect', imageFile.path, maskFile]);
     let stdout = '', stderr = '';
@@ -255,7 +341,7 @@ app.post('/api/remove-watermark', upload.fields([{ name: 'image' }, { name: 'mas
     const outputDir = path.join(__dirname, 'temp-watermark');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
     const outputFile = path.join(outputDir, `${Date.now()}-result.png`);
-    const pythonScript = path.join(__dirname, 'inpaint.py');
+    const pythonScript = path.join(__dirname, 'script', 'inpaint.py');
     const pythonProcess = spawn('python3', [pythonScript, 'remove', imageFile.path, maskFile.path, outputFile]);
     let stdout = '', stderr = '';
     pythonProcess.stdout.on('data', (data) => { stdout += data.toString(); });
@@ -270,6 +356,45 @@ app.post('/api/remove-watermark', upload.fields([{ name: 'image' }, { name: 'mas
         const resultBuffer = fs.readFileSync(outputFile);
         res.setHeader('Content-Type', 'image/png');
         res.send(resultBuffer);
+        setTimeout(() => { try { fs.unlinkSync(outputFile); } catch (e) {} }, 60000);
+    });
+});
+
+// ========== 去背景 ==========
+const removeBgScript = path.join(__dirname, 'script', 'remove-bg.py');
+
+app.post('/api/remove-background', upload.single('file'), (req, res) => {
+    const imageFile = req.file;
+    if (!imageFile) return res.status(400).json({ error: '缺少图片文件' });
+    
+    const outputDir = path.join(__dirname, 'temp-bg');
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    const outputFile = path.join(outputDir, `${Date.now()}-no-bg.png`);
+    
+    console.log('[BG] 开始去背景处理:', imageFile.originalname);
+    
+    const pythonProcess = spawn('python3', [removeBgScript, imageFile.path, outputFile]);
+    let stdout = '', stderr = '';
+    
+    pythonProcess.stdout.on('data', (data) => { stdout += data.toString(); });
+    pythonProcess.stderr.on('data', (data) => { stderr += data.toString(); });
+    
+    pythonProcess.on('close', (code) => {
+        // 清理输入文件
+        try { fs.unlinkSync(imageFile.path); } catch (e) {}
+        
+        if (code !== 0 || !fs.existsSync(outputFile)) {
+            console.error('[BG] 去背景失败:', stderr);
+            return res.status(500).json({ error: `去背景失败: ${stderr || '未知错误'}` });
+        }
+        
+        console.log('[BG] 去背景成功:', outputFile);
+        const resultBuffer = fs.readFileSync(outputFile);
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Content-Disposition', 'attachment; filename="no-bg.png"');
+        res.send(resultBuffer);
+        
+        // 1分钟后清理输出文件
         setTimeout(() => { try { fs.unlinkSync(outputFile); } catch (e) {} }, 60000);
     });
 });

@@ -1,4 +1,6 @@
 function Footer() {
+  return null // 暂时隐藏页脚
+  /*
   return (
     <footer className="bg-black/30 backdrop-blur-sm border-t border-white/10 mt-auto">
       <div className="container mx-auto px-4 py-6">
@@ -27,6 +29,7 @@ function Footer() {
       </div>
     </footer>
   )
+  */
 }
 
 export default Footer

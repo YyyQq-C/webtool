@@ -10,16 +10,56 @@ import sys
 import cv2
 import numpy as np
 import base64
+from PIL import Image
+
+def load_image(image_path):
+    """加载图片，支持多种格式（包括 ICO）"""
+    # 先尝试用 PIL 加载（支持更多格式）
+    try:
+        pil_img = Image.open(image_path)
+        # ICO 可能包含多个图标，取最大的一个
+        if hasattr(pil_img, 'size') and pil_img.format == 'ICO':
+            # 获取最大尺寸的图标
+            if hasattr(pil_img, 'info') and 'sizes' in pil_img.info:
+                sizes = pil_img.info['sizes']
+                max_size = max(sizes, key=lambda s: s[0] * s[1])
+                pil_img.size = max_size
+        # 转换为 RGB/RGBA
+        if pil_img.mode == 'P':
+            pil_img = pil_img.convert('RGBA')
+        elif pil_img.mode not in ('RGB', 'RGBA', 'L'):
+            pil_img = pil_img.convert('RGB')
+        # 转换为 OpenCV 格式
+        if pil_img.mode == 'RGBA':
+            cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGBA2BGRA)
+        elif pil_img.mode == 'RGB':
+            cv_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        else:  # L (灰度)
+            cv_img = np.array(pil_img)
+        return cv_img
+    except Exception as e:
+        # 如果 PIL 失败，尝试 OpenCV
+        cv_img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+        if cv_img is None:
+            print(f"Failed to read image: {str(e)}", file=sys.stderr)
+            return None
+        return cv_img
 
 def detect_watermark(image_path, output_mask_path):
     """智能检测水印区域"""
     try:
-        img = cv2.imread(image_path)
+        img = load_image(image_path)
         if img is None:
             print("Failed to read image", file=sys.stderr)
             sys.exit(1)
 
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # 如果是 RGBA，转灰度时只用 RGB 通道
+        if len(img.shape) == 3 and img.shape[2] == 4:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGRA2GRAY)
+        elif len(img.shape) == 3:
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = img
         h, w = gray.shape
 
         # 方法 1: 频域分析检测重复图案（FFT 检测周期性水印）
@@ -81,7 +121,7 @@ def remove_watermark(image_path, mask_path, output_path):
     只修复 mask 标记的区域，保持其他部分原样
     """
     try:
-        img = cv2.imread(image_path)
+        img = load_image(image_path)
         if img is None:
             print("Failed to read image", file=sys.stderr)
             sys.exit(1)
@@ -117,13 +157,16 @@ def remove_watermark(image_path, mask_path, output_path):
             result_ns = cv2.inpaint(img, mask_expanded, inpaintRadius=radius, flags=cv2.INPAINT_NS)
             mask_blurred = cv2.GaussianBlur(mask_expanded, (5, 5), 0)
             mask_normalized = mask_blurred.astype(np.float32) / 255.0
-            mask_3ch = cv2.merge([mask_normalized] * 3)
-            result = (result_ns * mask_3ch + result * (1 - mask_3ch)).astype(np.uint8)
+            # 根据图片通道数创建 mask
+            num_channels = img.shape[2] if len(img.shape) == 3 else 1
+            mask_multi = cv2.merge([mask_normalized] * num_channels)
+            result = (result_ns * mask_multi + result * (1 - mask_multi)).astype(np.uint8)
 
         # 只对 mask 区域进行替换，保持其他区域不变
-        mask_3ch = cv2.merge([mask] * 3)
-        mask_inv = cv2.bitwise_not(mask_3ch)
-        final = cv2.bitwise_and(img, mask_inv) + cv2.bitwise_and(result, mask_3ch)
+        num_channels = img.shape[2] if len(img.shape) == 3 else 1
+        mask_multi = cv2.merge([mask] * num_channels)
+        mask_inv = cv2.bitwise_not(mask_multi)
+        final = cv2.bitwise_and(img, mask_inv) + cv2.bitwise_and(result, mask_multi)
 
         cv2.imwrite(output_path, final)
         print("Success")

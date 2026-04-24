@@ -17,12 +17,12 @@ function ImageWatermarkRemover() {
   const originalImageRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 })
-  const canvasKey = useRef(0)
+  const [canvasKey, setCanvasKey] = useState(0) // 改成 state
 
   // 处理文件上传
   const handleFile = useCallback((file) => {
     if (!file || !file.type.startsWith('image/')) { setError('请上传图片文件'); return }
-    setError(''); setResult(null); setHasMask(false); setIsAutoDetecting(false); canvasKey.current++
+    setError(''); setResult(null); setHasMask(false); setIsAutoDetecting(false); setCanvasKey(prev => prev + 1)
     const reader = new FileReader()
     reader.onload = (e) => {
       const img = new Image()
@@ -55,7 +55,7 @@ function ImageWatermarkRemover() {
     if (originalImageRef.current) ctx.drawImage(originalImageRef.current, 0, 0, displaySize.width, displaySize.height)
     const maskCtx = maskCanvas.getContext('2d'); maskCtx.clearRect(0, 0, displaySize.width, displaySize.height)
     setHasMask(false)
-  }, [image, displaySize, canvasKey.current])
+  }, [image, displaySize, canvasKey])
 
   const getPosition = useCallback((e) => {
     const canvas = canvasRef.current, rect = canvas.getBoundingClientRect()
@@ -126,14 +126,14 @@ function ImageWatermarkRemover() {
     setError('')
     setHasMask(false)
     // 强制重新渲染 canvas
-    setTimeout(() => { canvasKey.current++ }, 100)
+    setCanvasKey(prev => prev + 1)
   }, [result])
 
   const clearAll = useCallback(() => {
     if (image?.preview) URL.revokeObjectURL(image.preview)
     if (result) URL.revokeObjectURL(result)
     setImage(null); setResult(null); setError(''); setIsAutoDetecting(false); setHasMask(false)
-    originalImageRef.current = null; canvasKey.current++
+    originalImageRef.current = null; setCanvasKey(prev => prev + 1)
   }, [image, result])
 
   const formatSize = (b) => { if (!b) return '0 B'; const k = 1024, s = ['B', 'KB', 'MB', 'GB'], i = Math.floor(Math.log(b) / Math.log(k)); return Math.round(b / Math.pow(k, i) * 100) / 100 + ' ' + s[i] }
@@ -173,7 +173,7 @@ function ImageWatermarkRemover() {
         <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-xl border border-[#475569] overflow-hidden">
           <div className="px-4 py-3 border-b border-[#475569] flex items-center justify-between"><div><h3 className="text-[#F8FAFC] font-semibold">标记水印区域</h3><p className="text-[#94A3B8] text-sm">用红色画笔涂抹水印位置，或使用智能检测</p></div><span className="text-[#64748B] text-sm">{image.name} ({formatSize(image.size)})</span></div>
           <div ref={containerRef} className="p-4 flex justify-center">
-            <div className="relative inline-block" key={canvasKey.current}>
+            <div className="relative inline-block" key={canvasKey}>
               <canvas ref={canvasRef} className="border border-[#475569] rounded-lg" style={{ touchAction: 'none' }} />
               <canvas ref={maskCanvasRef} className="absolute top-0 left-0 cursor-crosshair" style={{ touchAction: 'none' }} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} />
             </div>

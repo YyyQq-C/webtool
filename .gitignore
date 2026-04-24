@@ -28,4 +28,10 @@ __pycache__
 server/temp
 server/uploads
 server/temp-watermark
+server/temp-bg
 server/node_modules
+server/cache
+server/cache-map.json
+
+# Script generated files
+script/*.log
