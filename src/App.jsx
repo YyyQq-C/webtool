@@ -11,6 +11,7 @@ import ImageSplice from './pages/ImageSplice'
 import ImageWatermark from './pages/ImageWatermark'
 import ImageShape from './pages/ImageShape'
 import GifExtractor from './pages/GifExtractor'
+import QrCode from './pages/QrCode'
 import Footer from './components/Footer'
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
             <Route path="/image-watermark" element={<ImageWatermark />} />
             <Route path="/image-shape" element={<ImageShape />}  />
             <Route path="/gif-extractor" element={<GifExtractor />} />
+            <Route path="/qr-code" element={<QrCode />} />
           </Routes>
         </main>
         {/* <Footer /> */}

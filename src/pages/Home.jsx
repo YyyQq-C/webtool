@@ -70,6 +70,16 @@ const tools = [
     localOnly: true,
   },
   {
+    id: 'qr-code',
+    name: '二维码工具',
+    description: '生成二维码或解析图片中二维码',
+    icon: null,
+    emoji: '📱',
+    path: '/qr-code',
+    color: 'from-teal-500 to-cyan-600',
+    localOnly: true,
+  },
+  {
     id: 'web-to-pdf',
     name: '网页转PDF',
     description: '输入网址，将整个页面或页面图片导出为PDF',
