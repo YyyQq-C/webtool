@@ -7,6 +7,9 @@ import shutil
 import asyncio
 import base64
 import subprocess
+import socket
+import urllib.parse
+import ipaddress
 from pathlib import Path
 from typing import List, Optional
 
@@ -17,6 +20,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 from playwright.async_api import async_playwright
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 
 from services.downloader import DownloadImagesReq, get_url_hash, process_image_downloads
@@ -125,13 +132,60 @@ async def lifespan(app: FastAPI):
     if playwright_instance:
          await playwright_instance.stop()
 
+# 速率限制器初始化
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
 app = FastAPI(lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# 限制上传大小中间件 (25MB)
+class LimitUploadSize(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        content_length = request.headers.get('content-length')
+        if content_length and int(content_length) > 25 * 1024 * 1024:
+            return JSONResponse(status_code=413, content={"error": "请求体过大（最大限额 25MB）"})
+        return await call_next(request)
+        
+app.add_middleware(LimitUploadSize)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 简单的 SSRF 检查
+async def is_safe_url(url: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(url)
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+        if hostname.lower() in ['localhost', 'test', 'invalid']:
+            return False
+        # 尝试直接解析 IP 防止特殊格式
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                return False
+        except ValueError:
+            pass
+        # 异步解析域名
+        loop = asyncio.get_running_loop()
+        try:
+            addr_info = await loop.getaddrinfo(hostname, None)
+            for info in addr_info:
+                ip = info[4][0]
+                ip_obj = ipaddress.ip_address(ip)
+                if ip_obj.is_private or ip_obj.is_loopback or ip_obj.is_link_local:
+                    return False
+        except socket.gaierror:
+            return False
+        return True
+    except Exception:
+        return False
 
 # Docker 模式：挂载前端静态文件
 # 当 dist 目录存在时，FastAPI 直接服务前端
@@ -149,7 +203,8 @@ def health():
     return {"status": "ok"}
 
 @app.get("/api/stats")
-async def get_stats(increment: bool = False):
+@limiter.limit("60/minute")
+async def get_stats(request: Request, increment: bool = False):
     try:
         with open(stats_file, "r+") as f:
             data = json.load(f)
@@ -164,11 +219,15 @@ async def get_stats(increment: bool = False):
         return {"visits": 0, "startTime": 0}
 
 @app.get("/api/fetch-page")
-async def fetch_page(url: str):
+@limiter.limit("30/minute")
+async def fetch_page(request: Request, url: str):
     if not url:
         return JSONResponse({"error": "Missing url parameter"}, status_code=400)
     if not url.startswith('http://') and not url.startswith('https://'):
         url = 'https://' + url
+        
+    if not await is_safe_url(url):
+        return JSONResponse({"error": "非法的 URL 请求（SSRF防御已拦截）"}, status_code=403)
 
     try:
         browser = await get_browser()
@@ -179,10 +238,14 @@ async def fetch_page(url: str):
         return JSONResponse({"error": f"获取网页失败: {str(e)}"}, status_code=500)
 
 @app.post("/api/download-images")
-async def api_download_images(req: DownloadImagesReq):
+@limiter.limit("20/minute")
+async def api_download_images(request: Request, req: DownloadImagesReq):
     url = req.url
     images = req.images
     skip_cache = req.skipCache
+    
+    if url and not await is_safe_url(url):
+        return JSONResponse({"error": "非法的 URL 请求（SSRF防御已拦截）"}, status_code=403)
     
     try:
         url_hash = get_url_hash(url)
@@ -236,7 +299,8 @@ async def api_download_images(req: DownloadImagesReq):
         return JSONResponse({"error": f"下载图片失败: {str(e)}"}, status_code=500)
 
 @app.get("/api/session/{session_id}")
-async def get_session(session_id: str):
+@limiter.limit("60/minute")
+async def get_session(request: Request, session_id: str):
     if session_id not in sessions:
         return JSONResponse({"error": "会话不存在或已过期"}, status_code=404)
     session = sessions[session_id]
@@ -247,14 +311,26 @@ async def get_session(session_id: str):
     }
 
 @app.get("/api/temp/{session_id}/{filename}")
-async def get_temp_file(session_id: str, filename: str):
+@limiter.limit("120/minute")
+async def get_temp_file(request: Request, session_id: str, filename: str):
+    # 路径遍历漏洞防御
+    if ".." in filename or "/" in filename or "\\" in filename:
+        return JSONResponse({"error": "非法文件名"}, status_code=400)
+        
     file_path = TEMP_DIR / session_id / filename
+    resolved_path = file_path.resolve()
+    
+    # 确保解析后的绝对路径以 TEMP_DIR 的绝对路径开头，防止逃逸
+    if not str(resolved_path).startswith(str(TEMP_DIR.resolve())):
+        return JSONResponse({"error": "非法访问路径"}, status_code=403)
+        
     if not file_path.exists():
         return JSONResponse({"error": "文件不存在"}, status_code=404)
     return FileResponse(file_path)
 
 @app.post("/api/generate-images-pdf")
-async def generate_images_pdf(req: GenerateImagesPdfReq):
+@limiter.limit("10/minute")
+async def generate_images_pdf(request: Request, req: GenerateImagesPdfReq):
     session_id = req.sessionId
     selected_images = req.selectedImages
     if session_id not in sessions:
@@ -269,11 +345,15 @@ async def generate_images_pdf(req: GenerateImagesPdfReq):
         return JSONResponse({"error": f"PDF生成失败: {str(e)}"}, status_code=500)
 
 @app.post("/api/generate-pdf")
-async def generate_pdf(url: str, mode: str = "full"):
+@limiter.limit("5/minute")
+async def generate_pdf(request: Request, url: str, mode: str = "full"):
     if not url:
         return JSONResponse({"error": "Missing url parameter"}, status_code=400)
     if not url.startswith('http://') and not url.startswith('https://'):
         url = 'https://' + url
+        
+    if not await is_safe_url(url):
+        return JSONResponse({"error": "非法的 URL 请求（SSRF防御已拦截）"}, status_code=403)
         
     try:
         browser = await get_browser()
@@ -284,9 +364,17 @@ async def generate_pdf(url: str, mode: str = "full"):
         return JSONResponse({"error": f"PDF生成失败: {str(e)}"}, status_code=500)
 
 @app.post("/api/detect-watermark")
-async def detect_watermark(image: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def detect_watermark(request: Request, image: UploadFile = File(...)):
     if not image:
         return JSONResponse({"error": "缺少图片文件"}, status_code=400)
+        
+    valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic', '.heif')
+    is_image_mime = image.content_type.startswith("image/")
+    is_valid_ext = image.filename and image.filename.lower().endswith(valid_exts)
+    
+    if not (is_image_mime or is_valid_ext):
+        return JSONResponse({"error": "不合法的文件类型"}, status_code=400)
     
     img_path = UPLOAD_DIR / f"{int(time.time()*1000)}_{image.filename}"
     with open(img_path, "wb") as f:
@@ -305,9 +393,17 @@ async def detect_watermark(image: UploadFile = File(...)):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.post("/api/remove-watermark")
-async def remove_watermark(image: UploadFile = File(...), mask: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def remove_watermark(request: Request, image: UploadFile = File(...), mask: UploadFile = File(...)):
     if not image or not mask:
         return JSONResponse({"error": "缺少图片或蒙版文件"}, status_code=400)
+        
+    valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic', '.heif')
+    def is_valid_img(f: UploadFile):
+        return f.content_type.startswith("image/") or (f.filename and f.filename.lower().endswith(valid_exts))
+        
+    if not (is_valid_img(image) and is_valid_img(mask)):
+        return JSONResponse({"error": "不合法的文件类型"}, status_code=400)
         
     img_path = UPLOAD_DIR / f"img_{int(time.time()*1000)}_{image.filename}"
     mask_path = UPLOAD_DIR / f"mask_{int(time.time()*1000)}_{mask.filename}"
@@ -338,9 +434,17 @@ async def remove_watermark(image: UploadFile = File(...), mask: UploadFile = Fil
         return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.post("/api/remove-background")
-async def api_remove_background(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def api_remove_background(request: Request, file: UploadFile = File(...)):
     if not file:
         return JSONResponse({"error": "缺少图片文件"}, status_code=400)
+        
+    valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic', '.heif')
+    is_image_mime = file.content_type.startswith("image/")
+    is_valid_ext = file.filename and file.filename.lower().endswith(valid_exts)
+    
+    if not (is_image_mime or is_valid_ext):
+        return JSONResponse({"error": "不合法的文件类型"}, status_code=400)
         
     img_path = UPLOAD_DIR / f"bg_{int(time.time()*1000)}_{file.filename}"
     with open(img_path, "wb") as f: f.write(await file.read())

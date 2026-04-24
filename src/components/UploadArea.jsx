@@ -48,14 +48,18 @@ function UploadArea({ onDrop, isImageFile: customIsImageFile, onFileSelect, erro
 
     const allFiles = Array.from(e.dataTransfer.files)
     const validFiles = allFiles.filter(checkImage)
+    const sizeValidFiles = validFiles.filter(f => f.size <= 25 * 1024 * 1024)
 
     if (validFiles.length === 0 && allFiles.length > 0) {
       setLocalError('不支持的文件格式，请上传图片文件')
       setTimeout(() => setLocalError(''), 3000)
+    } else if (sizeValidFiles.length < validFiles.length) {
+      setLocalError('图片尺寸过大（最大限额 25MB）')
+      setTimeout(() => setLocalError(''), 3000)
     }
 
-    if (validFiles.length > 0 && onDrop) {
-      onDrop(validFiles)
+    if (sizeValidFiles.length > 0 && onDrop) {
+      onDrop(sizeValidFiles)
     }
   }, [onDrop, checkImage])
 
@@ -63,17 +67,21 @@ function UploadArea({ onDrop, isImageFile: customIsImageFile, onFileSelect, erro
     setLocalError('')
     const allFiles = Array.from(e.target.files)
     const validFiles = allFiles.filter(checkImage)
+    const sizeValidFiles = validFiles.filter(f => f.size <= 25 * 1024 * 1024)
 
     if (validFiles.length === 0 && allFiles.length > 0) {
       setLocalError('不支持的文件格式，请上传图片文件')
       setTimeout(() => setLocalError(''), 3000)
+    } else if (sizeValidFiles.length < validFiles.length) {
+      setLocalError('图片尺寸过大（最大限额 25MB）')
+      setTimeout(() => setLocalError(''), 3000)
     }
 
-    if (validFiles.length > 0) {
+    if (sizeValidFiles.length > 0) {
       if (onFileSelect) {
-        onFileSelect(validFiles[0])
+        onFileSelect(sizeValidFiles[0])
       } else if (onDrop) {
-        onDrop(validFiles)
+        onDrop(sizeValidFiles)
       }
     } else if (allFiles.length === 0) {
       // 用户取消了选择
@@ -139,7 +147,7 @@ function UploadArea({ onDrop, isImageFile: customIsImageFile, onFileSelect, erro
         </button>
 
         <p className="text-[#64748B] text-xs md:text-sm mt-4">
-          支持 JPG, PNG, WebP, BMP, GIF, AVIF, ICO, TIFF, SVG 格式
+          支持 JPG, PNG, WebP, BMP, HEIC 等常见格式 (最大 25MB)
         </p>
       </div>
 

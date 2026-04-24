@@ -4,6 +4,7 @@
 fastapi>=0.100.0
 uvicorn>=0.23.0
 python-multipart>=0.0.6
+slowapi>=0.1.8
 
 # 网页抓取与 PDF
 playwright>=1.35.0

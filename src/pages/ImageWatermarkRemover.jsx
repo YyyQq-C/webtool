@@ -21,7 +21,12 @@ function ImageWatermarkRemover() {
 
   // 处理文件上传
   const handleFile = useCallback((file) => {
-    if (!file || !file.type.startsWith('image/')) { setError('请上传图片文件'); return }
+    const validExts = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'heic', 'heif']
+    const isImageParams = file && (file.type.startsWith('image/') || validExts.includes(file.name.split('.').pop().toLowerCase()))
+    
+    if (!isImageParams) { setError('请上传正确格式的图片文件'); return }
+    if (file.size > 25 * 1024 * 1024) { setError('图片尺寸过大（最大 25MB）'); return }
+
     setError(''); setResult(null); setHasMask(false); setIsAutoDetecting(false); setCanvasKey(prev => prev + 1)
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -35,7 +40,9 @@ function ImageWatermarkRemover() {
     reader.readAsDataURL(file)
   }, [])
 
-  const handleDrop = useCallback((f) => { if (f.length > 0) handleFile(f[0]) }, [handleFile])
+  const handleDrop = useCallback((f) => { 
+    if (f.length > 0) handleFile(f[0]) 
+  }, [handleFile])
 
   // 计算显示尺寸
   useEffect(() => {
@@ -163,9 +170,14 @@ function ImageWatermarkRemover() {
       )}
 
       {!image && (
-        <div className="relative border-2 border-dashed border-[#475569] bg-[#1E293B]/40 hover:border-[#22C55E] hover:bg-[#1E293B]/60 rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')); if (f.length > 0) handleDrop(f) }} onClick={() => document.getElementById('wm-fi').click()}>
-          <input id="wm-fi" type="file" accept="image/*" onChange={(e) => { const f = Array.from(e.target.files); if (f.length > 0) handleFile(f[0]); e.target.value = '' }} className="hidden" />
-          <div className="text-6xl mb-4">💧</div><p className="text-xl font-medium text-[#F8FAFC] mb-2">拖拽图片到这里</p><p className="text-[#94A3B8]">或点击选择文件</p>
+        <div className="relative border-2 border-dashed border-[#475569] bg-[#1E293B]/40 hover:border-[#22C55E] hover:bg-[#1E293B]/60 rounded-2xl p-12 text-center transition-all duration-300 cursor-pointer" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { 
+          e.preventDefault(); 
+          const validExts = ['jpg', 'jpeg', 'png', 'webp', 'bmp', 'heic', 'heif'];
+          const f = Array.from(e.dataTransfer.files).filter(file => file.type.startsWith('image/') || validExts.includes(file.name.split('.').pop().toLowerCase())); 
+          if (f.length > 0) handleDrop(f) 
+        }} onClick={() => document.getElementById('wm-fi').click()}>
+          <input id="wm-fi" type="file" accept="image/*,.heic,.heif" onChange={(e) => { const f = Array.from(e.target.files); if (f.length > 0) handleFile(f[0]); e.target.value = '' }} className="hidden" />
+          <div className="text-6xl mb-4">💧</div><p className="text-xl font-medium text-[#F8FAFC] mb-2">拖拽图片到这里</p><p className="text-[#94A3B8]">或点击选择文件 (最大 25MB)</p>
         </div>
       )}
 
