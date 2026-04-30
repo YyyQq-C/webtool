@@ -1,0 +1,125 @@
+{
+  "pages": [
+    {
+      "path": "pages/about/about",
+      "style": {
+        "navigationBarTitleText": "关于",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationBarTitleText": "蓝胖子的口袋",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/converter/converter",
+      "style": {
+        "navigationBarTitleText": "图片格式转换",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/cropper/cropper",
+      "style": {
+        "navigationBarTitleText": "图片裁剪",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/compress/compress",
+      "style": {
+        "navigationBarTitleText": "图片压缩",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/qrcode/qrcode",
+      "style": {
+        "navigationBarTitleText": "二维码工具",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/watermark/watermark",
+      "style": {
+        "navigationBarTitleText": "图片加水印",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/splice/splice",
+      "style": {
+        "navigationBarTitleText": "图片拼接",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    },
+    {
+      "path": "pages/gif/gif",
+      "style": {
+        "navigationBarTitleText": "GIF分帧提取",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "蓝胖子的口袋",
+    "navigationBarBackgroundColor": "#10B981",
+    "backgroundColor": "#F5F7FA",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#6B7280",
+    "selectedColor": "#10B981",
+    "borderStyle": "white",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "工具",
+        "iconPath": "static/tab-tools.png",
+        "selectedIconPath": "static/tab-tools-active.png"
+      },
+      {
+        "pagePath": "pages/about/about",
+        "text": "关于",
+        "iconPath": "static/tab-about.png",
+        "selectedIconPath": "static/tab-about-active.png"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "path": "pages/about/about",
+      "style": {
+        "navigationBarTitleText": "关于",
+        "navigationBarBackgroundColor": "#10B981",
+        "navigationBarTextStyle": "white",
+        "backgroundColor": "#F5F7FA"
+      }
+    }
+    ]
+  }
+}

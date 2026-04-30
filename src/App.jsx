@@ -14,6 +14,13 @@ import GifExtractor from './pages/GifExtractor'
 import QrCode from './pages/QrCode'
 import ImageCompress from './pages/ImageCompress'
 import ImageCompare from './pages/ImageCompare'
+import PdfToWord from './pages/PdfToWord'
+import PhotoTools from './pages/PhotoTools'
+import ImageGridCut from './pages/ImageGridCut'
+import ImageToExcel from './pages/ImageToExcel'
+import ImageToWord from './pages/ImageToWord'
+import ImageEditor from './pages/ImageEditor'
+import IdPhotoMaker from './pages/IdPhotoMaker'
 import Footer from './components/Footer'
 
 function App() {
@@ -68,6 +75,13 @@ function App() {
             <Route path="/qr-code" element={<QrCode />} />
             <Route path="/image-compress" element={<ImageCompress />} />
             <Route path="/image-compare" element={<ImageCompare />} />
+            <Route path="/pdf-to-word" element={<PdfToWord />} />
+            <Route path="/photo-tools" element={<PhotoTools />} />
+            <Route path="/image-grid-cut" element={<ImageGridCut />} />
+            <Route path="/image-to-excel" element={<ImageToExcel />} />
+            <Route path="/image-to-word" element={<ImageToWord />} />
+            <Route path="/image-editor" element={<ImageEditor />} />
+            <Route path="/id-photo-maker" element={<IdPhotoMaker />} />
           </Routes>
         </main>
         {/* <Footer /> */}

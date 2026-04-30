@@ -8,8 +8,8 @@ const tools = [
     description: '支持拖拽上传，批量转换图片格式，打包下载',
     icon: '/image-cover.png',
     path: '/image-converter',
-    color: 'from-blue-500 to-purple-600',
-    localOnly: true, // 浏览器本地处理
+    iconBg: 'bg-[#3b82f6]',
+    localOnly: true,
   },
   {
     id: 'image-to-pdf',
@@ -17,8 +17,19 @@ const tools = [
     description: '多张图片合并为PDF，拖拽排序，一键生成',
     icon: '/image-pdf.png',
     path: '/image-to-pdf',
-    color: 'from-green-500 to-teal-600',
-    localOnly: true, // 浏览器本地处理
+    iconBg: 'bg-[#22c55e]',
+    localOnly: true,
+  },
+  {
+    id: 'id-photo-maker',
+    name: '证件照制作',
+    description: '裁剪、换底、美颜、排版打印，一站式证件照生成',
+    icon: null,
+    emoji: '📷',
+    path: '/id-photo-maker',
+    iconBg: 'bg-gradient-to-br from-[#ec4899] to-[#8b5cf6]',
+    localOnly: true,
+    badge: 'NEW',
   },
   {
     id: 'image-cropper',
@@ -26,7 +37,7 @@ const tools = [
     description: '自由裁剪、比例裁剪、旋转图片',
     icon: "/image_cut.png",
     path: '/image-cropper',
-    color: 'from-orange-500 to-red-600',
+    iconBg: 'bg-[#f97316]',
     localOnly: true,
   },
   {
@@ -36,7 +47,7 @@ const tools = [
     icon: null,
     emoji: '🧩',
     path: '/image-splice',
-    color: 'from-indigo-500 to-purple-600',
+    iconBg: 'bg-[#8b5cf6]',
     localOnly: true,
   },
   {
@@ -46,7 +57,7 @@ const tools = [
     icon: null,
     emoji: '🏷️',
     path: '/image-watermark',
-    color: 'from-amber-500 to-orange-600',
+    iconBg: 'bg-[#f59e0b]',
     localOnly: true,
   },
   {
@@ -56,7 +67,7 @@ const tools = [
     icon: null,
     emoji: '✨',
     path: '/image-shape',
-    color: 'from-fuchsia-500 to-pink-600',
+    iconBg: 'bg-[#ec4899]',
     localOnly: true,
   },
   {
@@ -66,7 +77,7 @@ const tools = [
     icon: null,
     emoji: '🎬',
     path: '/gif-extractor',
-    color: 'from-violet-500 to-purple-600',
+    iconBg: 'bg-[#8b5cf6]',
     localOnly: true,
   },
   {
@@ -76,7 +87,7 @@ const tools = [
     icon: null,
     emoji: '📱',
     path: '/qr-code',
-    color: 'from-teal-500 to-cyan-600',
+    iconBg: 'bg-[#14b8a6]',
     localOnly: true,
   },
   {
@@ -86,7 +97,7 @@ const tools = [
     icon: null,
     emoji: '📦',
     path: '/image-compress',
-    color: 'from-lime-500 to-green-600',
+    iconBg: 'bg-[#84cc16]',
     localOnly: true,
   },
   {
@@ -96,7 +107,7 @@ const tools = [
     icon: null,
     emoji: '🔍',
     path: '/image-compare',
-    color: 'from-sky-500 to-blue-600',
+    iconBg: 'bg-[#0ea5e9]',
     localOnly: false,
   },
   {
@@ -105,8 +116,18 @@ const tools = [
     description: '输入网址，将整个页面或页面图片导出为PDF',
     icon: "/pdf_dump.png",
     path: '/web-to-pdf',
-    color: 'from-purple-500 to-blue-600',
-    localOnly: false, // 需要服务器处理
+    iconBg: 'bg-[#8b5cf6]',
+    localOnly: false,
+  },
+  {
+    id: 'pdf-to-word',
+    name: 'PDF转Word',
+    description: 'PDF文档转换为Word格式，支持批量处理',
+    icon: null,
+    emoji: '📝',
+    path: '/pdf-to-word',
+    iconBg: 'bg-[#6366f1]',
+    localOnly: false,
   },
   {
     id: 'image-bg-remover',
@@ -114,8 +135,8 @@ const tools = [
     description: 'AI智能去除图片背景，支持预览和下载PNG',
     icon: "/remove_bg.png",
     path: '/image-bg-remover',
-    color: 'from-green-500 to-teal-600',
-    localOnly: false, // 需要服务器处理
+    iconBg: 'bg-[#22c55e]',
+    localOnly: false,
   },
   {
     id: 'image-watermark-remover',
@@ -123,8 +144,8 @@ const tools = [
     description: '用画笔标记水印区域，AI智能去除',
     icon: "/water_remove.png",
     path: '/image-watermark-remover',
-    color: 'from-cyan-500 to-blue-600',
-    localOnly: false, // 需要服务器处理
+    iconBg: 'bg-[#06b6d4]',
+    localOnly: false,
   },
   {
     id: 'image-resizer',
@@ -132,8 +153,51 @@ const tools = [
     description: '批量修改图片宽高，支持等比例缩放',
     icon: "/resolution_ratio.png",
     path: '/image-resizer',
-    color: 'from-pink-500 to-rose-600',
+    iconBg: 'bg-[#ec4899]',
     localOnly: true,
+ },
+  // 图片切图/转换
+  {
+    id: 'image-grid-cut',
+    name: '九宫格切图',
+    description: '将图片切分为多张，适合朋友圈分享',
+    icon: null,
+    emoji: '🔲',
+    path: '/image-grid-cut',
+    iconBg: 'bg-[#10b981]',
+    localOnly: true,
+  },
+  {
+    id: 'image-to-excel',
+    name: '图片转Excel',
+    description: '识别图片表格内容，生成可编辑Excel',
+    icon: null,
+    emoji: '📊',
+    path: '/image-to-excel',
+    iconBg: 'bg-[#3b82f6]',
+    localOnly: false,
+  },
+  {
+    id: 'image-to-word',
+    name: '图片转Word',
+    description: '识别图片文字内容，生成可编辑Word',
+    icon: null,
+    emoji: '📝',
+    path: '/image-to-word',
+    iconBg: 'bg-[#64748b]',
+    localOnly: false,
+  },
+  // 图片编辑（合并：增强 + 标注）
+  {
+    id: 'image-editor',
+    name: '图片编辑',
+    description: '边框、圆角、阴影、滤镜 + 文字、箭头、框选标注',
+    icon: null,
+    emoji: '🎨',
+    path: '/image-editor',
+    iconBg: 'bg-gradient-to-br from-[#f59e0b] to-[#ef4444]',
+    localOnly: true,
+    badge: '2合1',
   },
 ]
 
@@ -216,47 +280,40 @@ function Home() {
               to={tool.path}
               className="group block"
             >
-              <div className="bg-[#1E293B]/60 backdrop-blur-sm rounded-2xl p-6 hover:bg-[#1E293B]/80 transition-all duration-300 border border-[#475569] hover:border-[#22C55E] hover:shadow-2xl hover:shadow-green-500/20 transform hover:-translate-y-1 h-auto min-h-[220px] flex flex-col relative overflow-hidden">
-                {/* 背景装饰 */}
-                <div className={`absolute -right-4 -top-4 w-24 h-24 bg-gradient-to-br ${tool.color} opacity-10 blur-2xl rounded-full group-hover:opacity-20 transition-opacity`}></div>
-
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.color} flex items-center justify-center text-2xl shadow-lg`}>
-                    {tool.icon ? (
-                      // brightness-0 invert
-                      <img src={tool.icon} alt="" className="w-8 h-8 object-contain brightness-0 invert" />
+              <article className="bg-[#1E293B]/60 backdrop-blur-sm border border-[#475569] rounded-xl p-6 flex flex-col justify-between hover:border-[#22C55E] transition-all duration-300 hover:shadow-lg hover:shadow-green-500/10">
+                <div>
+                  <div className="flex items-start space-x-4 mb-4">
+                    <div className={`rounded-xl w-12 h-12 flex items-center justify-center shadow-lg ${tool.iconBg || 'bg-[#f97316]'}`}>
+                      {tool.icon ? (
+                        <img src={tool.icon} alt="" className="w-7 h-7 object-contain brightness-0 invert" />
+                      ) : (
+                        <span className="text-white text-2xl">{tool.emoji}</span>
+                      )}
+                    </div>
+                    <h2 className="text-xl font-semibold mt-1 text-white group-hover:text-[#22C55E] transition-colors">
+                      {tool.name}
+                    </h2>
+                  </div>
+                  <p className="text-[#9CA3AF] text-sm leading-relaxed mb-8">
+                    {tool.description}
+                  </p>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    {tool.localOnly ? (
+                      <span className="text-xs font-medium text-white bg-[#1a7332] px-2 py-1 rounded border border-[#2ea043]">无损本地</span>
                     ) : (
-                      <span>{tool.emoji}</span>
+                      <span className="text-xs font-medium text-[#9CA3AF] bg-[#374151] px-2 py-1 rounded">云端处理</span>
+                    )}
+                    {tool.badge && (
+                      <span className="text-xs font-medium text-white bg-gradient-to-r from-[#ec4899] to-[#8b5cf6] px-2 py-1 rounded">{tool.badge}</span>
                     )}
                   </div>
-                  {tool.localOnly && (
-                    <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider font-bold text-[#22C55E] bg-[#22C55E]/10 px-2 py-1 rounded-md">
-                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                      <span>无损本地</span>
-                    </div>
-                  )}
+                  <span className="text-blue-400 text-sm flex items-center">
+                    开始使用 <span className="ml-1 group-hover:translate-x-1 inline-block transition-transform">→</span>
+                  </span>
                 </div>
-
-                {/* 标题 */}
-                <h3 className="text-xl font-bold text-[#F8FAFC] mb-2 group-hover:text-[#22C55E] transition-colors">
-                  {tool.name}
-                </h3>
-
-                {/* 描述 */}
-                <p className="text-[#94A3B8] text-sm leading-relaxed mb-4">
-                  {tool.description}
-                </p>
-
-                {/* 底部箭头 */}
-                <div className="mt-auto pt-4 flex items-center text-[#22C55E] group-hover:text-[#10B981]">
-                  <span>开始使用</span>
-                  <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
-                </div>
-              </div>
+              </article>
             </Link>
           ))}
         </div>

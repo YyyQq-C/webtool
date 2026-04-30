@@ -29,8 +29,10 @@ from contextlib import asynccontextmanager
 from services.downloader import DownloadImagesReq, get_url_hash, process_image_downloads
 from services.scraper import fetch_page_data
 from services.pdf_maker import create_images_pdf, create_webpage_pdf, GenerateImagesPdfReq
+from services.pdf_to_word import pdf_to_word, get_status as get_pdf2word_status
 from script.inpaint import detect_watermark as inpaint_detect, remove_watermark as inpaint_remove
 from script.compare import compare_images
+from services.ocr_service import image_to_excel_async, image_to_word_async, get_ocr_status, OCR_AVAILABLE
 
 pwd = Path(__file__).parent.absolute()
 TEMP_DIR = pwd / "temp"
@@ -474,6 +476,235 @@ async def api_remove_background(request: Request, file: UploadFile = File(...)):
         print(f"[remove bg] err: {e}")
         asyncio.get_event_loop().run_in_executor(None, lambda: img_path.unlink(missing_ok=True))
         return JSONResponse({"error": str(e)}, status_code=500)
+
+# ==================== PDF转Word API ====================
+PDF2WORD_DIR = pwd / "pdf2word"
+PDF2WORD_DIR.mkdir(exist_ok=True)
+PDF2WORD_OUTPUT_DIR = PDF2WORD_DIR / "outputs"
+PDF2WORD_OUTPUT_DIR.mkdir(exist_ok=True)
+PDF2WORD_UPLOAD_DIR = PDF2WORD_DIR / "uploads"
+PDF2WORD_UPLOAD_DIR.mkdir(exist_ok=True)
+pdf2word_tasks = {}
+
+@app.get("/api/pdf2word/status")
+@limiter.limit("60/minute")
+async def pdf2word_status(request: Request):
+    """获取PDF转Word服务状态"""
+    return get_pdf2word_status()
+
+@app.post("/api/pdf2word/batch")
+@limiter.limit("5/minute")
+async def pdf2word_batch(request: Request, files: List[UploadFile] = File(...)):
+    """批量上传PDF转换"""
+    if not files:
+        return JSONResponse({"error": "没有上传文件"}, status_code=400)
+    
+    task_ids = []
+    for file in files:
+        if file.filename == '' or not file.filename.lower().endswith('.pdf'):
+            continue
+        
+        task_id = f"{int(time.time()*1000)}-{uuid.uuid4().hex[:8]}"
+        upload_path = PDF2WORD_UPLOAD_DIR / f"{task_id}_{file.filename}"
+        with open(upload_path, "wb") as f:
+            f.write(await file.read())
+        
+        pdf2word_tasks[task_id] = {
+            "status": "queued",
+            "progress": 0,
+            "filename": file.filename,
+            "upload_path": str(upload_path),
+            "output_path": None,
+            "message": "等待处理",
+            "created_at": int(time.time() * 1000)
+        }
+        task_ids.append({"taskId": task_id, "filename": file.filename})
+    
+    # 启动异步处理
+    async def process_tasks():
+        for task_id in task_ids:
+            tid = task_id['taskId']
+            task = pdf2word_tasks[tid]
+            pdf2word_tasks[tid]['status'] = 'processing'
+            pdf2word_tasks[tid]['progress'] = 10
+            
+            try:
+                success, output_path, msg = await asyncio.to_thread(
+                    pdf_to_word,
+                    task['upload_path'],
+                    str(PDF2WORD_OUTPUT_DIR)
+                )
+                pdf2word_tasks[tid]['progress'] = 100
+                if success:
+                    pdf2word_tasks[tid]['status'] = 'completed'
+                    pdf2word_tasks[tid]['output_path'] = output_path
+                    pdf2word_tasks[tid]['message'] = '转换成功'
+                else:
+                    pdf2word_tasks[tid]['status'] = 'failed'
+                    pdf2word_tasks[tid]['message'] = msg
+            except Exception as e:
+                pdf2word_tasks[tid]['status'] = 'failed'
+                pdf2word_tasks[tid]['message'] = str(e)
+    
+    asyncio.create_task(process_tasks())
+    
+    return {"tasks": task_ids, "count": len(task_ids)}
+
+@app.get("/api/pdf2word/task/{task_id}")
+@limiter.limit("60/minute")
+async def pdf2word_task_status(request: Request, task_id: str):
+    """查询任务状态"""
+    if task_id not in pdf2word_tasks:
+        return JSONResponse({"error": "任务不存在"}, status_code=404)
+    return pdf2word_tasks[task_id]
+
+@app.get("/api/pdf2word/download/{task_id}")
+@limiter.limit("30/minute")
+async def pdf2word_download(request: Request, task_id: str):
+    """下载转换结果"""
+    if task_id not in pdf2word_tasks:
+        return JSONResponse({"error": "任务不存在"}, status_code=404)
+    
+    task = pdf2word_tasks[task_id]
+    if task['status'] != 'completed':
+        return JSONResponse({"error": "任务未完成"}, status_code=400)
+    
+    output_path = task.get('output_path')
+    if not output_path or not Path(output_path).exists():
+        return JSONResponse({"error": "文件不存在"}, status_code=404)
+    
+    return FileResponse(
+        output_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=task['filename'].replace('.pdf', '.docx')
+    )
+
+# ==================== OCR API ====================
+OCR_DIR = pwd / "ocr"
+OCR_DIR.mkdir(exist_ok=True)
+OCR_OUTPUT_DIR = OCR_DIR / "outputs"
+OCR_OUTPUT_DIR.mkdir(exist_ok=True)
+OCR_UPLOAD_DIR = OCR_DIR / "uploads"
+OCR_UPLOAD_DIR.mkdir(exist_ok=True)
+ocr_tasks = {}
+
+@app.get("/api/ocr/status")
+@limiter.limit("60/minute")
+async def ocr_status_endpoint(request: Request):
+    """获取OCR服务状态"""
+    return get_ocr_status()
+
+@app.post("/api/image-to-excel")
+@limiter.limit("5/minute")
+async def api_image_to_excel(request: Request, files: List[UploadFile] = File(...), engine: str = Form("tesseract")):
+    """图片转Excel - 识别表格内容"""
+    if not OCR_AVAILABLE:
+        return JSONResponse({"error": "OCR服务未启用，请安装 pytesseract 或 paddleocr"}, status_code=503)
+    
+    if not files:
+        return JSONResponse({"error": "没有上传文件"}, status_code=400)
+    
+    task_id = f"{int(time.time()*1000)}-{uuid.uuid4().hex[:8]}"
+    upload_paths = []
+    
+    for file in files:
+        if not file.filename:
+            continue
+        valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic', '.heif')
+        if not file.filename.lower().endswith(valid_exts):
+            continue
+        upload_path = OCR_UPLOAD_DIR / f"{task_id}_{file.filename}"
+        with open(upload_path, "wb") as f:
+            f.write(await file.read())
+        upload_paths.append(str(upload_path))
+    
+    if not upload_paths:
+        return JSONResponse({"error": "没有有效的图片文件"}, status_code=400)
+    
+    output_path = str(OCR_OUTPUT_DIR / f"{task_id}.xlsx")
+    ocr_tasks[task_id] = {"status": "processing", "type": "excel", "files": [f.filename for f in files if f.filename], "created_at": int(time.time() * 1000), "output_path": output_path}
+    
+    try:
+        success, result_path, msg = await image_to_excel_async(upload_paths, output_path, engine)
+        if success:
+            ocr_tasks[task_id]["status"] = "completed"
+            for p in upload_paths:
+                asyncio.get_event_loop().run_in_executor(None, lambda: Path(p).unlink(missing_ok=True))
+            async def cleanup_output():
+                await asyncio.sleep(60)
+                Path(output_path).unlink(missing_ok=True)
+                if task_id in ocr_tasks:
+                    del ocr_tasks[task_id]
+            asyncio.create_task(cleanup_output())
+            return FileResponse(output_path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename=f"ocr_result_{task_id}.xlsx")
+        else:
+            ocr_tasks[task_id]["status"] = "failed"
+            ocr_tasks[task_id]["error"] = msg
+            return JSONResponse({"error": msg}, status_code=500)
+    except Exception as e:
+        print(f"[OCR-Excel] Error: {e}")
+        ocr_tasks[task_id]["status"] = "failed"
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/image-to-word")
+@limiter.limit("5/minute")
+async def api_image_to_word(request: Request, files: List[UploadFile] = File(...), engine: str = Form("tesseract")):
+    """图片转Word - 识别文字内容"""
+    if not OCR_AVAILABLE:
+        return JSONResponse({"error": "OCR服务未启用，请安装 pytesseract 或 paddleocr"}, status_code=503)
+    
+    if not files:
+        return JSONResponse({"error": "没有上传文件"}, status_code=400)
+    
+    task_id = f"{int(time.time()*1000)}-{uuid.uuid4().hex[:8]}"
+    upload_paths = []
+    
+    for file in files:
+        if not file.filename:
+            continue
+        valid_exts = ('.jpg', '.jpeg', '.png', '.webp', '.bmp', '.heic', '.heif')
+        if not file.filename.lower().endswith(valid_exts):
+            continue
+        upload_path = OCR_UPLOAD_DIR / f"{task_id}_{file.filename}"
+        with open(upload_path, "wb") as f:
+            f.write(await file.read())
+        upload_paths.append(str(upload_path))
+    
+    if not upload_paths:
+        return JSONResponse({"error": "没有有效的图片文件"}, status_code=400)
+    
+    output_path = str(OCR_OUTPUT_DIR / f"{task_id}.docx")
+    ocr_tasks[task_id] = {"status": "processing", "type": "word", "files": [f.filename for f in files if f.filename], "created_at": int(time.time() * 1000), "output_path": output_path}
+    
+    try:
+        success, result_path, msg = await image_to_word_async(upload_paths, output_path, engine)
+        if success:
+            ocr_tasks[task_id]["status"] = "completed"
+            for p in upload_paths:
+                asyncio.get_event_loop().run_in_executor(None, lambda: Path(p).unlink(missing_ok=True))
+            async def cleanup_output():
+                await asyncio.sleep(60)
+                Path(output_path).unlink(missing_ok=True)
+                if task_id in ocr_tasks:
+                    del ocr_tasks[task_id]
+            asyncio.create_task(cleanup_output())
+            return FileResponse(output_path, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", filename=f"ocr_result_{task_id}.docx")
+        else:
+            ocr_tasks[task_id]["status"] = "failed"
+            ocr_tasks[task_id]["error"] = msg
+            return JSONResponse({"error": msg}, status_code=500)
+    except Exception as e:
+        print(f"[OCR-Word] Error: {e}")
+        ocr_tasks[task_id]["status"] = "failed"
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.get("/api/ocr/task/{task_id}")
+@limiter.limit("60/minute")
+async def ocr_task_status(request: Request, task_id: str):
+    """查询OCR任务状态"""
+    if task_id not in ocr_tasks:
+        return JSONResponse({"error": "任务不存在"}, status_code=404)
+    return ocr_tasks[task_id]
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8000))
