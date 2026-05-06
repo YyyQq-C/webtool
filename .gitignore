@@ -33,6 +33,11 @@ server/node_modules
 server/cache
 server/cache-map.json
 server/stats.json
+server/ocr
+server/pdf2word
+
+
+
 
 # Script generated files
 script/*.log
