@@ -47,9 +47,14 @@ if [ -f "requirements.txt" ]; then
     $PIP_CMD install -r requirements.txt
 fi
 
-# 安装 Playwright 浏览器
-echo "🌍 安装 Playwright 浏览器依赖..."
-$PYTHON_CMD -m playwright install chromium
+# 检查并安装 Playwright 浏览器（仅在未安装时）
+echo "🌍 检查 Playwright 浏览器..."
+if [ ! -d "$HOME/.cache/ms-playwright/chromium-*" ] && [ ! -d "$HOME/.cache/ms-playwright/chromium_headless_shell-*" ]; then
+    echo "📥 首次安装 Playwright 浏览器..."
+    $PYTHON_CMD -m playwright install chromium
+else
+    echo "✅ Playwright 浏览器已存在"
+fi
 
 # 检查端口占用
 if lsof -i:$PORT > /dev/null 2>&1; then
