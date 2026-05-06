@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useReducer, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import Cropper from 'react-easy-crop'
-import { removeBackground as imglyRemoveBackground } from '@imgly/background-removal'
 
 // ============================================================================
 // 常量定义
@@ -56,6 +55,9 @@ const initialState = {
   bgColor: BG_COLORS[1].value,
   customColor: '#438EDB',
   useCustomColor: false,
+
+  // AI 去背景模型选择
+  bgModel: 'u2net_human_seg',  // 'u2net_human_seg' 或 'silueta'
 
   // 图像调整参数
   brightness: 0,        // -100 ~ 100
@@ -141,6 +143,9 @@ function reducer(state, action) {
     case 'SET_BG_COLOR':
       return { ...state, bgColor: action.payload }
 
+    case 'SET_BG_MODEL':
+      return { ...state, bgModel: action.payload, transparentUrl: null, bgRemoving: false }
+
     case 'SET_CUSTOM_COLOR':
       return {
         ...state,
@@ -217,18 +222,28 @@ async function cropImage(imageSrc, croppedAreaPixels, targetW, targetH) {
 }
 
 /**
- * 使用 @imgly/background-removal 在浏览器本地 AI 去背景
- * 优点：图片不上云、隐私安全、专门针对人像优化
+ * 调用服务器端 AI 去背景
+ * 使用 u2net_human_seg（人像专用）或 silueta（高精度）
  * @param {File} file - 原始图片文件
+ * @param {string} model - 模型选择: 'u2net_human_seg' 或 'silueta'
  * @returns {Promise<string>} - 透明背景图片的 blob URL
  */
-async function removeBackground(file) {
-  // 调用 imgly AI 去背景（浏览器内 ONNX 模型推理）
-  const blob = await imglyRemoveBackground(file, {
-    progress: (key, current, total) => {
-      // 静默加载模型，不打扰用户
-    },
+async function removeBackground(file, model = 'u2net_human_seg') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('model', model)
+  
+  const response = await fetch('/bg-api/api/remove-background', {
+    method: 'POST',
+    body: formData,
   })
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: '去背景失败' }))
+    throw new Error(error.error || '去背景失败')
+  }
+  
+  const blob = await response.blob()
   return URL.createObjectURL(blob)
 }
 
@@ -543,10 +558,10 @@ function IdPhotoMaker() {
         payload: { file, url, size: { width: img.width, height: img.height } },
       })
 
-      // 后台去背景，缓存透明图用于预览和生成
+      // 后台调用服务器 AI 去背景
       try {
-        dispatch({ type: 'SET_BG_PROGRESS', payload: 'AI 模型加载中（首次需下载约 30MB）...' })
-        const transparentUrl = await removeBackground(file)
+        dispatch({ type: 'SET_BG_PROGRESS', payload: 'AI 正在抠图（服务器端处理）...' })
+        const transparentUrl = await removeBackground(file, state.bgModel)
         dispatch({ type: 'SET_TRANSPARENT', payload: transparentUrl })
       } catch (err) {
         console.error('背景去除失败:', err)
@@ -554,7 +569,7 @@ function IdPhotoMaker() {
       }
     }
     img.src = url
-  }, [])
+  }, [state.bgModel])
 
   const handleDrop = useCallback((files) => {
     if (files && files.length > 0) handleFile(files[0])
@@ -928,6 +943,38 @@ function IdPhotoMaker() {
                     <div className="text-[10px] text-[#94A3B8]">适合已有证件照</div>
                   </button>
                 </div>
+                
+                {/* AI 模型选择 */}
+                {state.bgMode === 'ai' && (
+                  <div className="mb-3">
+                    <h4 className="text-xs text-[#94A3B8] mb-2">AI 模型选择</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => dispatch({ type: 'SET_BG_MODEL', payload: 'u2net_human_seg' })}
+                        className={`p-2 rounded-lg border transition-all text-xs ${
+                          state.bgModel === 'u2net_human_seg'
+                            ? 'bg-[#22C55E]/15 border-[#22C55E]'
+                            : 'bg-[#334155]/50 border-[#475569]'
+                        }`}
+                      >
+                        <div className="font-medium text-[#F8FAFC]">🧑 人像专用</div>
+                        <div className="text-[10px] text-[#94A3B8]">u2net_human_seg</div>
+                      </button>
+                      <button
+                        onClick={() => dispatch({ type: 'SET_BG_MODEL', payload: 'silueta' })}
+                        className={`p-2 rounded-lg border transition-all text-xs ${
+                          state.bgModel === 'silueta'
+                            ? 'bg-[#22C55E]/15 border-[#22C55E]'
+                            : 'bg-[#334155]/50 border-[#475569]'
+                        }`}
+                      >
+                        <div className="font-medium text-[#F8FAFC]">✨ 高精度</div>
+                        <div className="text-[10px] text-[#94A3B8]">silueta</div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 <h3 className="text-sm font-semibold text-[#F8FAFC] mb-3 flex items-center gap-2">
                   🎨 背景颜色
                 </h3>
@@ -1158,7 +1205,7 @@ function IdPhotoMaker() {
                 )}
                 {state.transparentUrl && state.bgMode === 'ai' && (
                   <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-green-900/30 rounded-lg text-sm text-green-400">
-                    ✅ <span>AI 抠图完成，切换颜色实时预览</span>
+                    ✅ <span>AI 抠图完成（{state.bgModel === 'u2net_human_seg' ? '人像专用' : '高精度'}模型），切换颜色实时预览</span>
                   </div>
                 )}
                 {state.bgMode === 'simple' && (

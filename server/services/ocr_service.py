@@ -10,35 +10,43 @@ from typing import List, Dict, Any, Optional
 from PIL import Image
 
 # OCR引擎选择
-OCR_ENGINE = os.environ.get("OCR_ENGINE", "tesseract")  # tesseract, paddleocr, easyocr
+OCR_ENGINE = os.environ.get("OCR_ENGINE", "paddleocr")  # paddleocr, tesseract, easyocr
 
 
 def check_ocr_dependencies():
     """检查OCR依赖是否安装"""
     global OCR_ENGINE
     
+    # 先检查 Tesseract（系统命令）
     try:
         import pytesseract
+        pytesseract.get_tesseract_version()
         print("[OCR] Tesseract OCR 可用")
+        OCR_ENGINE = "tesseract"
         return True
-    except ImportError:
-        print("[OCR] Tesseract OCR 未安装，尝试使用其他引擎")
+    except Exception as e:
+        print(f"[OCR] Tesseract OCR 不可用: {e}")
     
-    try:
-        from paddleocr import PaddleOCR
-        print("[OCR] PaddleOCR 可用")
-        OCR_ENGINE = "paddleocr"
-        return True
-    except ImportError:
-        print("[OCR] PaddleOCR 未安装")
-    
+    # 再检查 EasyOCR
     try:
         import easyocr
         print("[OCR] EasyOCR 可用")
         OCR_ENGINE = "easyocr"
         return True
-    except ImportError:
-        print("[OCR] EasyOCR 未安装")
+    except Exception as e:
+        print(f"[OCR] EasyOCR 不可用: {e}")
+    
+    # 最后尝试 PaddleOCR
+    try:
+        import os
+        os.environ['FLAGS_use_mkldnn'] = '0'
+        os.environ['FLAGS_enable_onednn'] = '0'
+        from paddleocr import PaddleOCR
+        print("[OCR] PaddleOCR 可用")
+        OCR_ENGINE = "paddleocr"
+        return True
+    except Exception as e:
+        print(f"[OCR] PaddleOCR 不可用: {e}")
     
     print("[OCR] 警告：没有可用的OCR引擎")
     return False
@@ -77,10 +85,17 @@ def ocr_image_tesseract(image_path: str, lang: str = 'chi_sim+eng') -> List[Dict
 
 def ocr_image_paddleocr(image_path: str) -> List[Dict]:
     """使用PaddleOCR识别图片"""
+    # 禁用 ONEDNN/MKLDNN 避免兼容性问题
+    import os
+    os.environ['FLAGS_use_mkldnn'] = '0'
+    os.environ['FLAGS_enable_onednn'] = '0'
+    os.environ['FLAGS_enable_ir_optim'] = '0'  # 禁用 IR 优化
+    
     from paddleocr import PaddleOCR
     
-    ocr = PaddleOCR(use_angle_cls=True, lang='ch', show_log=False)
-    result = ocr.ocr(image_path, cls=True)
+    # 使用 enable_mkldnn=False 避免问题
+    ocr = PaddleOCR(use_angle_cls=True, lang='ch', enable_mkldnn=False)
+    result = ocr.ocr(image_path)
     
     results = []
     if result and result[0]:

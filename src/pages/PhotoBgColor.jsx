@@ -29,6 +29,7 @@ function PhotoBgColor() {
   const [resultImage, setResultImage] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [mode, setMode] = useState('simple') // simple: 简单换底, smart: 智能抠图
+  const [bgModel, setBgModel] = useState('u2net_human_seg') // AI 去背景模型
   
   const canvasRef = useRef(null)
   const originalCanvasRef = useRef(null)
@@ -93,7 +94,7 @@ function PhotoBgColor() {
     img.src = image.preview
   }
 
-  // 智能换底色（需要调用后端API去背景）
+  // 智能换底色（调用后端API去背景）
   const changeBgSmart = async () => {
     if (!image) return
     
@@ -103,6 +104,7 @@ function PhotoBgColor() {
       // 调用后端去背景API
       const formData = new FormData()
       formData.append('file', image.file)
+      formData.append('model', bgModel)  // 指定 AI 模型
       
       const res = await fetch('/bg-api/api/remove-background', {
         method: 'POST',
@@ -279,6 +281,31 @@ function PhotoBgColor() {
                   <div className="text-sm text-[#94A3B8]">自动去背景换底</div>
                 </button>
               </div>
+              
+              {/* AI 模型选择 */}
+              {mode === 'smart' && (
+                <div className="mt-4">
+                  <h4 className="text-sm text-[#94A3B8] mb-2">AI 模型选择</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setBgModel('u2net_human_seg')}
+                      className={`p-3 rounded-xl border transition-all ${bgModel === 'u2net_human_seg' ? 'bg-[#22C55E]/20 border-[#22C55E]' : 'bg-[#475569]/20 border-[#475569]'}`}
+                    >
+                      <div className="font-semibold text-[#F8FAFC]">🧑 人像专用</div>
+                      <div className="text-xs text-[#94A3B8]">u2net_human_seg</div>
+                      <div className="text-xs text-[#64748B]">证件照优化</div>
+                    </button>
+                    <button
+                      onClick={() => setBgModel('silueta')}
+                      className={`p-3 rounded-xl border transition-all ${bgModel === 'silueta' ? 'bg-[#22C55E]/20 border-[#22C55E]' : 'bg-[#475569]/20 border-[#475569]'}`}
+                    >
+                      <div className="font-semibold text-[#F8FAFC]">✨ 高精度</div>
+                      <div className="text-xs text-[#94A3B8]">silueta</div>
+                      <div className="text-xs text-[#64748B]">精细边缘</div>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

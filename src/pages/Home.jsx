@@ -256,24 +256,8 @@ function Home() {
   }, [])
 
   return (
-    <div className="container mx-auto px-4 py-12 flex flex-col xl:flex-row items-center xl:items-start gap-12">
-      {/* 顶部/左侧图标 */}
-      <div className="xl:flex-shrink-0 xl:sticky xl:top-12 flex flex-col items-center">
-        <Link to="/" className="hover:opacity-80 transition-opacity mb-4">
-          <img src="/tool-logo.png" alt="蓝胖子的口袋" className="w-32 h-32 md:w-36 md:h-36 xl:w-44 xl:h-44 object-contain shadow-2xl rounded-3xl" />
-        </Link>
-        <div className="flex items-center gap-3 bg-[#1E293B]/40 px-4 py-2 rounded-full border border-[#334155] backdrop-blur-md">
-          <h2 className="text-[#F8FAFC] font-bold tracking-wider text-sm">蓝胖子的工具</h2>
-          <div className="h-3 w-[1px] bg-[#334155]"></div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E] animate-pulse"></span>
-            <span className="text-[#94A3B8] font-mono text-xs font-bold">{"累计访问: " + stats.visits.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-grow w-full">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+    <div className="container mx-auto px-4 py-12">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {tools.map((tool) => (
             <Link
               key={tool.id}
@@ -316,7 +300,6 @@ function Home() {
               </article>
             </Link>
           ))}
-        </div>
       </div>
     </div>
   )
