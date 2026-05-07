@@ -45,14 +45,24 @@ check_dependencies() {
     # npm
     command -v npm &>/dev/null || error "npm 未安装"
     
+    # Node.js 版本检查
+    local node_version
+    node_version=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$node_version" -lt 18 ]; then
+        error "Node.js 版本过低，需要 >= 18 (当前: $(node -v))"
+    fi
+    
     # Nginx
     command -v nginx &>/dev/null || warn "Nginx 未安装，将只构建前端"
     
     # Python3
-    command -v python3 &>/dev/null || warn "Python3 未安装，将跳过 Python 依赖"
-    
-    # pip
-    command -v pip3 &>/dev/null || warn "pip3 未安装，将跳过 Python 依赖"
+    if command -v python3 &>/dev/null; then
+        log "Python3: $(python3 --version 2>&1)"
+    elif command -v python &>/dev/null && python --version 2>&1 | grep -q "Python 3"; then
+        log "Python: $(python --version 2>&1)"
+    else
+        warn "Python3 未安装，将跳过 Python 依赖"
+    fi
     
     log "依赖检查完成 ✓"
 }
@@ -71,8 +81,14 @@ install_frontend_deps() {
 
 # 安装 Python 依赖及浏览器
 install_python_deps() {
-    if ! command -v pip3 &>/dev/null; then
-        warn "pip3 未安装，跳过 Python 依赖"
+    # 检查 Python3
+    local PYTHON_CMD=""
+    if command -v python3 &>/dev/null; then
+        PYTHON_CMD="python3"
+    elif command -v python &>/dev/null && python --version 2>&1 | grep -q "Python 3"; then
+        PYTHON_CMD="python"
+    else
+        warn "Python3 未安装，跳过 Python 依赖"
         return
     fi
     
@@ -82,14 +98,14 @@ install_python_deps() {
         log "安装 Python 依赖..."
         
         # 始终运行安装以确保依赖最新
-        pip3 install -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
+        $PYTHON_CMD -m pip install -r "$REQUIREMENTS_FILE" 2>&1 | tee -a "$LOG_FILE" || {
             warn "部分 Python 模块安装失败，尝试单独安装核心模块..."
-            pip3 install rembg Pillow opencv-python-headless fastapi uvicorn playwright httpx 2>&1 | tee -a "$LOG_FILE" || warn "核心模块安装失败"
+            $PYTHON_CMD -m pip install rembg Pillow opencv-python-headless fastapi uvicorn playwright httpx 2>&1 | tee -a "$LOG_FILE" || warn "核心模块安装失败"
         }
         
         # 安装 Playwright 浏览器
         log "安装 Playwright 浏览器..."
-        playwright install chromium 2>&1 | tee -a "$LOG_FILE" || warn "Playwright 浏览器安装失败"
+        $PYTHON_CMD -m playwright install chromium 2>&1 | tee -a "$LOG_FILE" || warn "Playwright 浏览器安装失败"
         
         log "Python 依赖及浏览器安装完成 ✓"
     else
@@ -202,8 +218,15 @@ verify_deployment() {
     fi
     
     # 检查 Python 模块
+    local PYTHON_CMD=""
     if command -v python3 &>/dev/null; then
-        python3 -c "import rembg; import cv2; import PIL" 2>/dev/null && log "Python 模块正常 ✓" || warn "部分 Python 模块缺失"
+        PYTHON_CMD="python3"
+    elif command -v python &>/dev/null && python --version 2>&1 | grep -q "Python 3"; then
+        PYTHON_CMD="python"
+    fi
+    
+    if [ -n "$PYTHON_CMD" ]; then
+        $PYTHON_CMD -c "import rembg; import cv2; import PIL; from paddleocr import PaddleOCR" 2>/dev/null && log "Python 模块正常 ✓" || warn "部分 Python 模块缺失"
     fi
 }
 

@@ -438,7 +438,19 @@ async def remove_watermark(request: Request, image: UploadFile = File(...), mask
 
 @app.post("/api/remove-background")
 @limiter.limit("10/minute")
-async def api_remove_background(request: Request, file: UploadFile = File(...)):
+async def api_remove_background(request: Request, file: UploadFile = File(...), model: str = Form("u2net_human_seg")):
+    """
+    图片去背景
+    
+    Args:
+        file: 图片文件
+        model: 模型选择
+               - u2net_human_seg: 人像专用，证件照优化 (默认)
+               - silueta: 高精度人像分割
+               - u2net: 通用场景
+               - u2netp: 轻量通用
+               - bria_rmbg: 商业级去背景
+    """
     if not file:
         return JSONResponse({"error": "缺少图片文件"}, status_code=400)
         
@@ -448,6 +460,11 @@ async def api_remove_background(request: Request, file: UploadFile = File(...)):
     
     if not (is_image_mime or is_valid_ext):
         return JSONResponse({"error": "不合法的文件类型"}, status_code=400)
+    
+    # 验证模型参数
+    valid_models = ['u2net', 'u2net_human_seg', 'silueta', 'u2netp', 'bria_rmbg']
+    if model not in valid_models:
+        model = 'u2net_human_seg'  # 默认使用人像模型
         
     img_path = UPLOAD_DIR / f"bg_{int(time.time()*1000)}_{file.filename}"
     with open(img_path, "wb") as f: f.write(await file.read())
@@ -456,11 +473,11 @@ async def api_remove_background(request: Request, file: UploadFile = File(...)):
     out_dir.mkdir(exist_ok=True)
     out_file = out_dir / f"{int(time.time()*1000)}-no-bg.png"
     
-    print(f"[BG] 开始去背景处理: {file.filename}")
+    print(f"[BG] 开始去背景处理: {file.filename}, 模型: {model}")
     
     try:
         from script.remove_bg import remove_background as rembg_process
-        await asyncio.to_thread(rembg_process, str(img_path), str(out_file))
+        await asyncio.to_thread(rembg_process, str(img_path), str(out_file), model)
         
         asyncio.get_event_loop().run_in_executor(None, lambda: img_path.unlink(missing_ok=True))
         
@@ -596,7 +613,7 @@ async def ocr_status_endpoint(request: Request):
 
 @app.post("/api/image-to-excel")
 @limiter.limit("5/minute")
-async def api_image_to_excel(request: Request, files: List[UploadFile] = File(...), engine: str = Form("tesseract")):
+async def api_image_to_excel(request: Request, files: List[UploadFile] = File(...), engine: str = Form(None)):
     """图片转Excel - 识别表格内容"""
     if not OCR_AVAILABLE:
         return JSONResponse({"error": "OCR服务未启用，请安装 pytesseract 或 paddleocr"}, status_code=503)
@@ -648,7 +665,7 @@ async def api_image_to_excel(request: Request, files: List[UploadFile] = File(..
 
 @app.post("/api/image-to-word")
 @limiter.limit("5/minute")
-async def api_image_to_word(request: Request, files: List[UploadFile] = File(...), engine: str = Form("tesseract")):
+async def api_image_to_word(request: Request, files: List[UploadFile] = File(...), engine: str = Form(None)):
     """图片转Word - 识别文字内容"""
     if not OCR_AVAILABLE:
         return JSONResponse({"error": "OCR服务未启用，请安装 pytesseract 或 paddleocr"}, status_code=503)
