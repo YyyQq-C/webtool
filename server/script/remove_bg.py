@@ -21,6 +21,17 @@ MODEL_MAP = {
     'bria_rmbg': '商业级去背景',
 }
 
+# Session 缓存，避免每次请求重新加载模型
+_session_cache = {}
+
+def get_session(model):
+    """获取或创建缓存的 session"""
+    if model not in _session_cache:
+        print(f"[rembg] 加载模型: {model}")
+        _session_cache[model] = new_session(model)
+        print(f"[rembg] 模型 {model} 已缓存")
+    return _session_cache[model]
+
 def remove_background(input_path, output_path, model='u2net_human_seg'):
     """
     去除图片背景
@@ -36,8 +47,8 @@ def remove_background(input_path, output_path, model='u2net_human_seg'):
                - bria_rmbg: 商业级去背景
     """
     try:
-        # 使用指定模型创建会话
-        session = new_session(model)
+        # 使用缓存的 session，避免每次重新加载模型
+        session = get_session(model)
         
         with open(input_path, 'rb') as f:
             input_data = f.read()
@@ -48,7 +59,7 @@ def remove_background(input_path, output_path, model='u2net_human_seg'):
         with open(output_path, 'wb') as f:
             f.write(output_data)
         
-        print(f"Success (model: {model})")
+        print(f"[rembg] 处理完成 (model: {model})")
         return True
     except Exception as e:
         raise RuntimeError(str(e))
